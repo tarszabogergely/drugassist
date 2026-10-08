@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Belgyógyászat Osztály</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK & Config -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 18px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 { margin: 0; font-size: 20px; }
+
+.container { padding: 30px; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+th, td { padding: 14px; font-size: 14px; }
+th { background-color: #f0f2f5; text-align: left; }
+tr:not(:last-child) { border-bottom: 1px solid #eee; }
+
+.status-cell { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.orange { background-color: #ff9800; }
+.blue { background-color: #2196f3; }
+.green { background-color: #4caf50; }
+.gray { background-color: #9e9e9e; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Belgyógyászat</h1>
+    <div id="dateTime"></div>
+</header>
+
+<div class="container">
+
+<table>
+    <thead>
+        <tr>
+            <th>Beteg</th>
+            <th>Ágy</th>
+            <th>Státusz</th>
+            <th>Aktivitás</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Kovács János</td>
+            <td>12/B</td>
+            <td>
+                <div class="status-cell">
+                    <div class="status-dot orange"></div>
+                    Jóváhagyásra vár
+                </div>
+            </td>
+            <td><button onclick="location.href='patient.html'">Megnyitás</button></td>
+        </tr>
+    </tbody>
+</table>
+
+</div>
+
+<script>
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateDateTime();
+setInterval(updateDateTime, 10000);
+</script>
+
+</body>
+</html>
