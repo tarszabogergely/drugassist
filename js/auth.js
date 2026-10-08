@@ -115,7 +115,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await Auth.login(username, password);
             if (result.success) {
-                window.location.href = 'dashboard.html';
+                // Szerepkör alapú átirányítás
+                if (result.user.activeRole === 'doctor' || result.user.activeRole === 'nurse') {
+                    window.location.href = 'doctor-dashboard.html';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
             } else {
                 if (errorBox) {
                     errorBox.innerText = result.message;
