@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Gyógyszerelésre vár</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK & Config -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 18px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.container {
+    padding: 30px;
+}
+
+.section {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+th, td {
+    padding: 14px;
+    font-size: 14px;
+}
+
+th {
+    background-color: #f0f2f5;
+    text-align: left;
+}
+
+tr:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
+
+tr:hover {
+    background-color: #fafafa;
+}
+
+.action-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background-color: #4caf50;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.badge {
+    background-color: #2196f3;
+    color: white;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Gyógyszerelésre vár</h1>
+    <div id="dateTime"></div>
+</header>
+
+<div class="container">
+
+    <div class="section">
+        <div class="section-title">
+            Belgyógyászat <span class="badge">4 beteg</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Beteg neve</th>
+                    <th>Ágy</th>
+                    <th>Jóváhagyva</th>
+                    <th>Gyógyszersorok</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Kovács János</td>
+                    <td>12/B</td>
+                    <td>09:15</td>
+                    <td>8</td>
+                    <td><button class="action-btn" onclick="location.href='patient.html'">Gyógyszerelés</button></td>
+                </tr>
+                <tr>
+                    <td>Nagy Péter</td>
+                    <td>14/A</td>
+                    <td>09:22</td>
+                    <td>6</td>
+                    <td><button class="action-btn" onclick="location.href='patient.html'">Gyógyszerelés</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateDateTime();
+setInterval(updateDateTime, 10000);
+</script>
+
+</body>
+</html>
