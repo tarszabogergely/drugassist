@@ -16,7 +16,7 @@ const Auth = {
         }
     },
 
-    // Munkamenet-védelem az oldalakra (ha nincs belépve, visszadobja az index.html-re)
+    // Munkamenet-védelem az oldalakra
     requireAuth() {
         const user = this.getCurrentUser();
         if (!user) {
@@ -26,45 +26,48 @@ const Auth = {
         return user;
     },
 
-    // Bejelentkezési logika
+    // Bejelentkezési logika Supabase alapon
     async login(username, password) {
         if (!username || !password) {
             return { success: false, message: "Kérjük, adja meg a felhasználónevet és a jelszót!" };
         }
 
         try {
-            // 1. Próbálkozás Supabase-en keresztül (ha fel vannak véve a profilok)
-            if (window.supabaseClient) {
-                const { data, error } = await window.supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('username', username)
-                    .single();
-
-                if (data && !error) {
-                    const userData = {
-                        id: data.id,
-                        username: data.username,
-                        name: data.full_name,
-                        role: data.default_role || 'pharmacist',
-                        department: data.default_department || 'Belgyógyászat'
-                    };
-                    localStorage.setItem('drugassist_user', JSON.stringify(userData));
-                    return { success: true, user: userData };
-                }
+            if (!window.supabaseClient) {
+                return { success: false, message: "Hiba: A Supabase kapcsolat nem érhető el!" };
             }
 
-            // 2. Fallback / Demó bejelentkezés (amíg az adatok feltöltése folyik)
-            const demoUser = {
-                id: "demo-user-001",
-                username: username,
-                name: username === 'gergo' ? 'Dr. Tarszabó Gergely' : 'Dr. Kovács Anna',
-                role: 'pharmacist',
-                department: 'Belgyógyászat'
+            // 1. Profil lekérése felhasználónév alapján
+            const { data: profile, error } = await window.supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('username', username)
+                .single();
+
+            if (error || !profile) {
+                return { success: false, message: "Hibás felhasználónév vagy jelszó!" };
+            }
+
+            // 2. Szerepkörök lekérése a user_roles táblából
+            const { data: rolesData } = await window.supabaseClient
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', profile.id);
+
+            const userRoles = rolesData ? rolesData.map(r => r.role) : [profile.default_role];
+
+            // Mentés a munkamenetbe
+            const userData = {
+                id: profile.id,
+                username: profile.username,
+                name: profile.full_name,
+                activeRole: profile.default_role || userRoles[0],
+                roles: userRoles,
+                activeDepartment: profile.default_department || 'Belgyógyászat'
             };
-            
-            localStorage.setItem('drugassist_user', JSON.stringify(demoUser));
-            return { success: true, user: demoUser };
+
+            localStorage.setItem('drugassist_user', JSON.stringify(userData));
+            return { success: true, user: userData };
 
         } catch (err) {
             console.error("Bejelentkezési hiba:", err);
@@ -72,32 +75,27 @@ const Auth = {
         }
     },
 
-    // Kijelentkezési logika
-    async logout() {
+    // Kijelentkezés
+    logout() {
         localStorage.removeItem('drugassist_user');
-        if (window.supabaseClient && window.supabaseClient.auth) {
-            await window.supabaseClient.auth.signOut();
-        }
         window.location.href = 'index.html';
     },
 
-    // Aktív szerepkör vagy osztály váltása a munkamenetben
-    updateSessionContext(role, department) {
+    // Aktív szerepkör vagy osztály frissítése
+    updateContext(newRole, newDepartment) {
         const user = this.getCurrentUser();
         if (user) {
-            if (role) user.role = role;
-            if (department) user.department = department;
+            if (newRole) user.activeRole = newRole;
+            if (newDepartment) user.activeDepartment = newDepartment;
             localStorage.setItem('drugassist_user', JSON.stringify(user));
         }
     }
 };
 
-// Automatikus eseménykezelő a bejelentkezési gombra, ha az index.html-en vagyunk
+// Auto-bind a login gombra az index.html-en
 document.addEventListener('DOMContentLoaded', () => {
-    const loginBtn = document.querySelector('button[onclick*="dashboard.html"]');
+    const loginBtn = document.getElementById('loginButton');
     if (loginBtn) {
-        // Átírjuk a gomb viselkedését, hogy a valódi login logikát futtassa
-        loginBtn.removeAttribute('onclick');
         loginBtn.addEventListener('click', async () => {
             const usernameInput = document.getElementById('username');
             const passwordInput = document.getElementById('password');
@@ -105,11 +103,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = usernameInput ? usernameInput.value.trim() : '';
             const password = passwordInput ? passwordInput.value.trim() : '';
 
+            const errorBox = document.getElementById('loginError');
+            if (errorBox) errorBox.innerText = '';
+
             const result = await Auth.login(username, password);
             if (result.success) {
                 window.location.href = 'dashboard.html';
             } else {
-                alert(result.message);
+                if (errorBox) {
+                    errorBox.innerText = result.message;
+                } else {
+                    alert(result.message);
+                }
             }
         });
     }
