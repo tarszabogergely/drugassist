@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Osztályos Betegellátás</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 14px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 { margin: 0; font-size: 22px; color: #1565c0; }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.badge-select {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #c8e6c9;
+    background: #f0f7ed;
+    color: #2e7d32;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.logout-btn {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.container { padding: 32px; max-width: 1200px; margin: auto; }
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.top-bar h2 { margin: 0; color: #2c3e50; }
+
+.add-patient-btn {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.25);
+}
+
+.add-patient-btn:hover { background: #1565c0; }
+
+/* PATIENT TABLE */
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td { padding: 14px; text-align: left; font-size: 14px; }
+th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+tr:hover { background-color: #f8fafc; }
+
+.bed-badge {
+    background: #e2e8f0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-submitted { background: #fff3e0; color: #e65100; }
+.status-completed { background: #e8f5e9; color: #2e7d32; }
+.status-none { background: #f1f5f9; color: #64748b; }
+
+.action-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #1976d2;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.action-btn:hover { background: #1565c0; }
+
+.discharge-btn {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.discharge-btn:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+/* MODAL */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-card {
+    background: white;
+    width: 440px;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.modal-card h3 { margin-top: 0; color: #1e293b; }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; color: #64748b; margin-bottom: 6px; font-weight: 600; }
+.form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.cancel-btn { background: #f1f5f9; color: #475569; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.save-btn { background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Osztályos Betegek</h1>
+    <div class="header-right">
+        <span id="userName" style="font-weight:600;">Dr. Kovács Anna</span>
+        
+        <!-- OSZTÁLY VÁLASZTÓ -->
+        <select id="deptSelector" class="badge-select" onchange="changeDepartment(this.value)">
+            <option value="Belgyógyászat">Belgyógyászat</option>
+            <option value="Sebészet">Sebészet</option>
+            <option value="Neurológia">Neurológia</option>
+            <option value="Kardiológia">Kardiológia</option>
+        </select>
+
+        <button class="logout-btn" onclick="Auth.logout()">Kijelentkezés</button>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="top-bar">
+        <div>
+            <h2 id="deptTitle">Belgyógyászati Osztály</h2>
+            <div style="color:#64748b; font-size:14px; margin-top:4px;">Aktív ápolt betegek listája</div>
+        </div>
+        <button class="add-patient-btn" onclick="openAddPatientModal()">➕ Új beteg rögzítése</button>
+    </div>
+
+    <!-- BETEG TÁBLÁZAT -->
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 90px;">Ágyszám</th>
+                    <th>Beteg Neve</th>
+                    <th>TAJ Szám</th>
+                    <th>Mai Gyógyszerelés</th>
+                    <th style="text-align: right;">Műveletek</th>
+                </tr>
+            </thead>
+            <tbody id="patientTableBody">
+                <!-- JavaScript tölti fel -->
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- ÚJ BETEG MODAL -->
+<div id="addPatientModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3>➕ Új beteg rögzítése az osztályra</h3>
+        
+        <div class="form-group">
+            <label>Beteg Neve *</label>
+            <input type="text" id="newPatientName" placeholder="pl. Kovács János">
+        </div>
+
+        <div class="form-group">
+            <label>TAJ Szám *</label>
+            <input type="text" id="newPatientTaj" placeholder="123 456 789">
+        </div>
+
+        <div class="form-group">
+            <label>Kórterem / Ágyszám *</label>
+            <input type="text" id="newPatientBed" placeholder="pl. 12/B">
+        </div>
+
+        <div class="modal-actions">
+            <button class="cancel-btn" onclick="closeAddPatientModal()">Mégse</button>
+            <button class="save-btn" onclick="saveNewPatient()">Beteg Mentése</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentDept = 'Belgyógyászat';
+
+document.addEventListener("DOMContentLoaded", () => {
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+        currentDept = user.activeDepartment || 'Belgyógyászat';
+        document.getElementById("deptSelector").value = currentDept;
+        document.getElementById("deptTitle").innerText = `${currentDept} Osztály`;
+        
+        loadDepartmentPatients();
+    }
+});
+
+function changeDepartment(newDept) {
+    currentDept = newDept;
+    Auth.updateContext(null, newDept);
+    document.getElementById("deptTitle").innerText = `${currentDept} Osztály`;
+    loadDepartmentPatients();
+}
+
+// 1. Osztályos betegek betöltése Supabase-ből
+async function loadDepartmentPatients() {
+    const tbody = document.getElementById("patientTableBody");
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Betegek betöltése...</td></tr>';
+
+    try {
+        const { data: patients, error } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .eq('department', currentDept)
+            .eq('status', 'active')
+            .order('room_bed', { ascending: true });
+
+        if (error || !patients || patients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b; padding:30px;">Nincs aktív beteg ezen az osztályon. Használja az "Új beteg rögzítése" gombot!</td></tr>';
+            return;
+        }
+
+        let html = '';
+        patients.forEach(p => {
+            html += `
+                <tr>
+                    <td><span class="bed-badge">${p.room_bed}</span></td>
+                    <td><strong style="font-size:15px; color:#1e293b;">${p.name}</strong></td>
+                    <td style="color:#64748b;">${p.taj}</td>
+                    <td><span class="status-badge status-none">Nincs feladva</span></td>
+                    <td style="text-align: right;">
+                        <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Gyógyszerelés</button>
+                        <button class="discharge-btn" onclick="dischargePatient('${p.id}', '${p.name}')">Hazament</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+
+    } catch (err) {
+        console.error("Hiba a betegek betöltésekor:", err);
+    }
+}
+
+// 2. Új beteg hozzáadása modal
+function openAddPatientModal() {
+    document.getElementById("addPatientModal").style.display = "flex";
+}
+
+function closeAddPatientModal() {
+    document.getElementById("addPatientModal").style.display = "none";
+    document.getElementById("newPatientName").value = '';
+    document.getElementById("newPatientTaj").value = '';
+    document.getElementById("newPatientBed").value = '';
+}
+
+async function saveNewPatient() {
+    const name = document.getElementById("newPatientName").value.trim();
+    const taj = document.getElementById("newPatientTaj").value.trim();
+    const bed = document.getElementById("newPatientBed").value.trim();
+
+    if (!name || !taj || !bed) {
+        alert("Kérjük, minden mezőt töltsön ki!");
+        return;
+    }
+
+    try {
+        const { error } = await window.supabaseClient
+            .from('patients')
+            .insert({
+                name: name,
+                taj: taj,
+                room_bed: bed,
+                department: currentDept,
+                status: 'active'
+            });
+
+        if (error) throw error;
+
+        closeAddPatientModal();
+        loadDepartmentPatients();
+
+    } catch (err) {
+        console.error("Hiba a beteg mentésekor:", err);
+        alert("Hiba történt a beteg mentése során!");
+    }
+}
+
+// 3. Beteg elbocsátása / Hazament (Soft-delete)
+async function dischargePatient(patientId, name) {
+    if (!confirm(`Biztosan elbocsátja ${name} nevű beteget? A beteg lekerül az aktív osztályos listáról.`)) {
+        return;
+    }
+
+    try {
+        await window.supabaseClient
+            .from('patients')
+            .update({ status: 'discharged', discharge_date: new Date() })
+            .eq('id', patientId);
+
+        loadDepartmentPatients();
+
+    } catch (err) {
+        console.error("Hiba az elbocsátás során:", err);
+    }
+}
+</script>
+
+</body>
+</html>
