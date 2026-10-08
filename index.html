@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DrugAssist – Bejelentkezés</title>
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
-/* ===== ALAP ===== */
 body {
     margin: 0;
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -21,7 +21,6 @@ body {
     justify-content: center;
 }
 
-/* ===== KÁRTYA ===== */
 .container {
     display: flex;
     width: 900px;
@@ -33,7 +32,6 @@ body {
     overflow: hidden;
 }
 
-/* ===== BAL OLDAL ===== */
 .left {
     flex: 1;
     display: flex;
@@ -49,13 +47,6 @@ body {
     margin-bottom: 20px;
 }
 
-.brand {
-    font-size: 26px;
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-/* ===== JOBB OLDAL ===== */
 .right {
     flex: 1;
     display: flex;
@@ -73,10 +64,9 @@ h2 {
     font-weight: 600;
 }
 
-/* ===== INPUT ===== */
 .inputGroup {
     position: relative;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .inputGroup input {
@@ -97,7 +87,6 @@ h2 {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
 }
 
-/* ===== GOMB ===== */
 button {
     width: 100%;
     padding: 14px;
@@ -117,8 +106,12 @@ button:hover {
     box-shadow: 0 10px 25px rgba(52, 152, 219, 0.4);
 }
 
-button:active {
-    transform: translateY(0);
+.error-msg {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-bottom: 15px;
+    text-align: center;
+    min-height: 18px;
 }
 
 .footer {
@@ -127,39 +120,16 @@ button:active {
     color: #7f8c8d;
     text-align: center;
 }
-
-/* ===== MOBIL ===== */
-@media(max-width: 900px) {
-    .container {
-        flex-direction: column;
-        width: 90%;
-        height: auto;
-    }
-
-    .left {
-        padding: 20px;
-    }
-
-    .left img {
-        width: 180px;
-    }
-
-    .right {
-        padding: 30px;
-    }
-}
 </style>
 </head>
 
 <body>
 
 <div class="container">
-    <!-- BAL OLDAL -->
     <div class="left">
         <img src="https://drugassistlogo.netlify.app/drugassistlogo.png" alt="DrugAssist Logo">
     </div>
 
-    <!-- JOBB OLDAL -->
     <div class="right">
         <div class="loginBox">
             <h2>Bejelentkezés</h2>
@@ -172,7 +142,9 @@ button:active {
                 <input type="password" id="password" placeholder="Jelszó">
             </div>
 
-            <button type="button" onclick="location.href='dashboard.html'">Bejelentkezés</button>
+            <div id="loginError" class="error-msg"></div>
+
+            <button type="button" id="loginButton">Bejelentkezés</button>
 
             <div class="footer">
                 Gyógyszerbiztonsági rendszer
