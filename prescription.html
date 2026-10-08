@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Gyógyszerigénylés Feladása</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK, Config, Auth & Prescription -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/prescription.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 14px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 { margin: 0; font-size: 20px; }
+
+.container { padding: 30px; max-width: 1100px; margin: auto; }
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+.patient-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.patient-title { font-size: 24px; font-weight: 700; color: #1565c0; }
+.patient-sub { color: #666; font-size: 14px; margin-top: 4px; }
+
+.copy-btn {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.copy-btn:hover { background: #bbdefb; }
+
+/* SEARCH BOX */
+.search-container { position: relative; margin-bottom: 20px; }
+.search-input {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 2px solid #1976d2;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.dropdown-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.dropdown-item:hover { background: #f0f7ff; }
+.sub-text { font-size: 12px; color: #777; margin-top: 2px; }
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td { padding: 12px; text-align: left; font-size: 14px; }
+th { background-color: #f0f2f5; }
+tr:not(:last-child) { border-bottom: 1px solid #eee; }
+
+table input[type="number"] {
+    width: 55px;
+    padding: 6px;
+    text-align: center;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-weight: bold;
+}
+
+.drug-title { font-size: 15px; color: #2c3e50; }
+.atc-badge { font-size: 11px; color: #1976d2; font-weight: 600; }
+.original-order-sub { font-size: 12px; color: #d32f2f; margin-top: 4px; font-style: italic; }
+
+.remove-btn { background: none; border: none; cursor: pointer; font-size: 16px; }
+
+.submit-row { display: flex; justify-content: flex-end; margin-top: 20px; }
+.submit-btn {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.submit-btn:hover { background: #256428; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Osztályos Gyógyszerigénylés</h1>
+    <div><a href="ward.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza az osztályra</a></div>
+</header>
+
+<div class="container">
+
+<!-- BETEG FEJLÉC -->
+<div class="card patient-header">
+    <div>
+        <div id="patientName" class="patient-title">Beteg betöltése...</div>
+        <div id="patientInfo" class="patient-sub"></div>
+    </div>
+    <button class="copy-btn" onclick="Prescription.copyPreviousDay()">📋 Előző napi jóváhagyott terápia másolása</button>
+</div>
+
+<!-- GYÓGYSZER KERESŐ -->
+<div class="card">
+    <h3>💊 Gyógyszer hozzáadása (PuPha törzs)</h3>
+    <div class="search-container">
+        <input type="text" id="puphaSearchInput" class="search-input" placeholder="Gépeljen be legalább 3 karaktert (Gyógyszernév, Hatóanyag vagy ATC)..." oninput="Prescription.searchPupha(this.value.trim())">
+        <div id="puphaSearchResults" class="dropdown-menu"></div>
+    </div>
+
+    <!-- GYÓGYSZERELÉSI TÁBLÁZAT -->
+    <table>
+        <thead>
+            <tr>
+                <th>Gyógyszer / ATC</th>
+                <th style="width:60px;">Reggel</th>
+                <th style="width:60px;">Délben</th>
+                <th style="width:60px;">Este</th>
+                <th style="width:60px;">Éjjel</th>
+                <th style="width:90px; text-align:center;">Saját gyógyszer</th>
+                <th style="width:50px;"></th>
+            </tr>
+        </thead>
+        <tbody id="prescriptionTableBody">
+            <!-- prescription.js tölti fel -->
+        </tbody>
+    </table>
+
+    <div class="submit-row">
+        <button class="submit-btn" onclick="Prescription.submitOrder()">🚀 Gyógyszerigénylés feladása a Patikának</button>
+    </div>
+</div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    Auth.requireAuth();
+    
+    // URL paraméterből beteg ID kiolvasása (pl. prescription.html?patientId=uuid)
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get('patientId');
+
+    if (patientId) {
+        Prescription.loadPatientOrder(patientId);
+    } else {
+        // Demó teszt ID, ha nincs paraméter
+        Prescription.loadPatientOrder('11111111-1111-1111-1111-111111111111');
+    }
+});
+</script>
+
+</body>
+</html>
