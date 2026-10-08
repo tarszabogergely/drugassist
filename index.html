@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrugAssist – Bejelentkezés</title>
+
+<!-- Supabase SDK & Config -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+
+<style>
+/* ===== ALAP ===== */
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100vh;
+    background: linear-gradient(135deg, #eef2f7, #dfe6ee);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ===== KÁRTYA ===== */
+.container {
+    display: flex;
+    width: 900px;
+    height: 520px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+/* ===== BAL OLDAL ===== */
+.left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(160deg, #ffffff, #f4f7fb);
+    padding: 40px;
+}
+
+.left img {
+    width: 240px;
+    margin-bottom: 20px;
+}
+
+.brand {
+    font-size: 26px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* ===== JOBB OLDAL ===== */
+.right {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loginBox {
+    width: 280px;
+}
+
+h2 {
+    margin-bottom: 25px;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+/* ===== INPUT ===== */
+.inputGroup {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.inputGroup input {
+    width: 100%;
+    padding: 14px 12px;
+    border-radius: 10px;
+    border: 1px solid #d0d7e2;
+    font-size: 15px;
+    background: #f9fbfd;
+    transition: 0.2s;
+    box-sizing: border-box;
+}
+
+.inputGroup input:focus {
+    outline: none;
+    border-color: #3498db;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+/* ===== GOMB ===== */
+button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    box-shadow: 0 6px 15px rgba(52, 152, 219, 0.3);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(52, 152, 219, 0.4);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+.footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #7f8c8d;
+    text-align: center;
+}
+
+/* ===== MOBIL ===== */
+@media(max-width: 900px) {
+    .container {
+        flex-direction: column;
+        width: 90%;
+        height: auto;
+    }
+
+    .left {
+        padding: 20px;
+    }
+
+    .left img {
+        width: 180px;
+    }
+
+    .right {
+        padding: 30px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <!-- BAL OLDAL -->
+    <div class="left">
+        <img src="https://drugassistlogo.netlify.app/drugassistlogo.png" alt="DrugAssist Logo">
+    </div>
+
+    <!-- JOBB OLDAL -->
+    <div class="right">
+        <div class="loginBox">
+            <h2>Bejelentkezés</h2>
+
+            <div class="inputGroup">
+                <input type="text" id="username" placeholder="Felhasználónév">
+            </div>
+
+            <div class="inputGroup">
+                <input type="password" id="password" placeholder="Jelszó">
+            </div>
+
+            <button type="button" onclick="location.href='dashboard.html'">Bejelentkezés</button>
+
+            <div class="footer">
+                Gyógyszerbiztonsági rendszer
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
