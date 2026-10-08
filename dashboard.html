@@ -5,9 +5,10 @@
 <title>DrugAssist – Kezdőlap</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
 body {
@@ -16,10 +17,10 @@ body {
     background-color: #f4f6f9;
 }
 
-/* ===== HEADER ===== */
+/* ===== HEADER & CONTEXT SWITCHER ===== */
 header {
     background: white;
-    padding: 18px 32px;
+    padding: 14px 32px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
     justify-content: space-between;
@@ -32,9 +33,49 @@ header h1 {
     font-weight: 600;
 }
 
-.user-info {
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #2c3e50;
     font-size: 14px;
-    color: #666;
+}
+
+.badge-select {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #d0d7e2;
+    background: #eef4fb;
+    color: #1976d2;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+}
+
+.badge-select.dept {
+    background: #f0f7ed;
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
+.logout-btn {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.logout-btn:hover {
+    background: #ffcdd2;
 }
 
 /* ===== CONTAINER ===== */
@@ -67,21 +108,9 @@ header h1 {
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-.status-title {
-    font-size: 16px;
-    font-weight: 500;
-}
-
-.status-number {
-    font-size: 40px;
-    font-weight: 700;
-    text-align: right;
-}
-
-.status-sub {
-    font-size: 12px;
-    color: #888;
-}
+.status-title { font-size: 16px; font-weight: 500; }
+.status-number { font-size: 40px; font-weight: 700; text-align: right; }
+.status-sub { font-size: 12px; color: #888; }
 
 .orange { border-left: 6px solid #ff9800; }
 .blue { border-left: 6px solid #2196f3; }
@@ -108,43 +137,21 @@ header h1 {
     align-items: center;
 }
 
-.ward-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.ward-left {
-    flex: 1;
-}
-
-.ward-card h3 {
-    margin-top: 0;
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.ward-status {
-    font-size: 14px;
-    line-height: 1.6;
-    color: #555;
-}
+.ward-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+.ward-card h3 { margin-top: 0; font-size: 18px; font-weight: 600; }
+.ward-status { font-size: 14px; line-height: 1.6; color: #555; }
 
 .ward-indicator {
-    width: 70px;
-    height: 70px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 36px;
-    font-weight: bold;
+    width: 70px; height: 70px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; font-weight: bold;
 }
 
 .success { background: #e8f5e9; color: #4caf50; }
 .warning { background: #fff3e0; color: #ff9800; }
 .processing { background: #e3f2fd; color: #2196f3; }
 
-/* ===== BOTTOM MODULES ===== */
+/* ===== BOTTOM ACTIONS ===== */
 .bottom-actions {
     margin-top: 60px;
     display: grid;
@@ -153,32 +160,15 @@ header h1 {
 }
 
 .icon-button {
-    background: white;
-    border-radius: 16px;
+    background: white; border-radius: 16px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-    cursor: pointer;
-    transition: 0.2s;
-    height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    cursor: pointer; transition: 0.2s; height: 120px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
 }
 
-.icon-button:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.icon {
-    font-size: 34px;
-}
-
-.icon-text {
-    margin-top: 8px;
-    font-weight: 500;
-    font-size: 14px;
-}
+.icon-button:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+.icon { font-size: 34px; }
+.icon-text { margin-top: 8px; font-weight: 500; font-size: 14px; }
 </style>
 </head>
 
@@ -186,10 +176,28 @@ header h1 {
 
 <header>
     <h1>DrugAssist</h1>
-    <div class="user-info">
-        <span id="userNameDisplay">Dr. Kovács Anna (Gyógyszerész)</span> |
-        <span id="currentDate"></span>
-        <span id="currentTime"></span>
+    <div class="header-right">
+        <span id="userName" class="user-name">Kovács Anna</span>
+        
+        <!-- SZEREPKÖR VÁLASZTÓ -->
+        <select id="roleSelector" class="badge-select" onchange="changeRole(this.value)">
+            <option value="pharmacist">🧪 Gyógyszerész</option>
+            <option value="doctor">📋 Orvos / Igénylő</option>
+            <option value="assistant">💊 Asszisztens</option>
+            <option value="nurse">🏥 Ápoló</option>
+        </select>
+
+        <!-- OSZTÁLY VÁLASZTÓ -->
+        <select id="deptSelector" class="badge-select dept" onchange="changeDepartment(this.value)">
+            <option value="Belgyógyászat">Belgyógyászat</option>
+            <option value="Sebészet">Sebészet</option>
+            <option value="Neurológia">Neurológia</option>
+            <option value="Kardiológia">Kardiológia</option>
+            <option value="Központi Patika">Központi Patika</option>
+        </select>
+
+        <span id="clock" style="font-size: 13px; color: #777;"></span>
+        <button class="logout-btn" onclick="Auth.logout()">Kijelentkezés</button>
     </div>
 </header>
 
@@ -223,12 +231,7 @@ header h1 {
     <div class="ward-card" onclick="location.href='ward.html'">
         <div class="ward-left">
             <h3>Belgyógyászat</h3>
-            <div class="ward-status">
-                Betegek: 38 <br>
-                Függő: 0 <br>
-                Folyamatban: 0 <br>
-                Kész: 38
-            </div>
+            <div class="ward-status">Betegek: 38 | Kész: 38</div>
         </div>
         <div class="ward-indicator success">✓</div>
     </div>
@@ -236,60 +239,26 @@ header h1 {
     <div class="ward-card" onclick="location.href='ward.html'">
         <div class="ward-left">
             <h3>Sebészet</h3>
-            <div class="ward-status">
-                Betegek: 24 <br>
-                Függő: 2 <br>
-                Folyamatban: 3 <br>
-                Kész: 19
-            </div>
-        </div>
-        <div class="ward-indicator warning">⏳</div>
-    </div>
-
-    <div class="ward-card" onclick="location.href='ward.html'">
-        <div class="ward-left">
-            <h3>Neurológia</h3>
-            <div class="ward-status">
-                Betegek: 18 <br>
-                Függő: 0 <br>
-                Folyamatban: 2 <br>
-                Kész: 16
-            </div>
-        </div>
-        <div class="ward-indicator processing">↻</div>
-    </div>
-
-    <div class="ward-card" onclick="location.href='ward.html'">
-        <div class="ward-left">
-            <h3>Kardiológia</h3>
-            <div class="ward-status">
-                Betegek: 20 <br>
-                Függő: 1 <br>
-                Folyamatban: 0 <br>
-                Kész: 19
-            </div>
+            <div class="ward-status">Betegek: 24 | Függő: 2</div>
         </div>
         <div class="ward-indicator warning">⏳</div>
     </div>
 </div>
 
-<!-- ===== VEZÉRLŐPULT ===== -->
+<!-- ===== BOTTOM MODULES ===== -->
 <div class="bottom-actions">
     <div class="icon-button" onclick="location.href='cikktorzs.html'">
         <div class="icon">💊</div>
         <div class="icon-text">Gyógyszerek</div>
     </div>
-
     <div class="icon-button">
         <div class="icon">📊</div>
         <div class="icon-text">Kimutatás</div>
     </div>
-
     <div class="icon-button" onclick="location.href='patients.html'">
         <div class="icon">👤</div>
         <div class="icon-text">Betegek</div>
     </div>
-
     <div class="icon-button">
         <div class="icon">⚙</div>
         <div class="icon-text">Beállítások</div>
@@ -299,13 +268,40 @@ header h1 {
 </div>
 
 <script>
-function updateDateTime() {
-    const now = new Date();
-    document.getElementById("currentDate").textContent = now.toLocaleDateString("hu-HU") + " ";
-    document.getElementById("currentTime").textContent = now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+// Munkamenet betöltése és fejléc frissítése
+document.addEventListener("DOMContentLoaded", () => {
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+        
+        // Szerepkör választó beállítása
+        const roleSel = document.getElementById("roleSelector");
+        if (roleSel) {
+            roleSel.value = user.activeRole || 'pharmacist';
+        }
+
+        // Osztály választó beállítása
+        const deptSel = document.getElementById("deptSelector");
+        if (deptSel) {
+            deptSel.value = user.activeDepartment || 'Belgyógyászat';
+        }
+    }
+});
+
+function changeRole(newRole) {
+    Auth.updateContext(newRole, null);
 }
-updateDateTime();
-setInterval(updateDateTime, 10000);
+
+function changeDepartment(newDept) {
+    Auth.updateContext(null, newDept);
+}
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById("clock").textContent = now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateClock();
+setInterval(updateClock, 10000);
 </script>
 
 </body>
