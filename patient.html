@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DrugAssist - Beteg</title>
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
 * { box-sizing: border-box; }
@@ -47,9 +48,6 @@ header h1 { margin: 0; font-size: 22px; }
 }
 
 .patient-name {
-    display: flex;
-    align-items: center;
-    gap: 10px;
     font-size: 28px;
     font-weight: 700;
 }
@@ -58,19 +56,20 @@ header h1 { margin: 0; font-size: 22px; }
     display: grid;
     grid-template-columns: 220px 1fr;
     row-gap: 10px;
+    margin-top: 15px;
 }
 
 .label { color: #666; }
 
 .action-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 24px;
     margin-bottom: 24px;
 }
 
 .action-card {
-    min-height: 180px;
+    min-height: 150px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -92,9 +91,11 @@ button:hover { background: #1565c0; }
 
 #scannerInput {
     width: 220px;
-    padding: 6px;
+    padding: 8px;
     font-size: 16px;
     text-align: center;
+    border-radius: 8px;
+    border: 1px solid #ccc;
 }
 
 #patientNote {
@@ -156,12 +157,6 @@ button:hover { background: #1565c0; }
         <button id="printLabelButton">Címke nyomtatása</button>
     </section>
 
-    <!-- PDF -->
-    <section class="card action-card">
-        <h2>📄 Gyógyszerelési lista</h2>
-        <button class="file-button">📂 PDF megtekintése</button>
-    </section>
-
     <!-- VONALKÓD BEOLVASÁS -->
     <section class="card action-card">
         <h2>📦 Vonalkód beolvasás</h2>
@@ -173,7 +168,7 @@ button:hover { background: #1565c0; }
 <section class="card">
     <h2>💊 Gyógyszerek</h2>
     <div id="medicationList">
-        <p>A gyógyszerelési tételek itt fognak megjelenni.</p>
+        <p>A gyógyszerelési tételek itt fognak megjelenni a Supabase-ből.</p>
     </div>
 </section>
 
@@ -191,6 +186,13 @@ button:hover { background: #1565c0; }
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+    }
+});
+
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
