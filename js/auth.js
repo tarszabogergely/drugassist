@@ -1,10 +1,10 @@
 /**
- * DrugAssist - Autentikáció és Munkamenet Kezelő Modul
+ * DrugAssist - Egyszerűsített Belső Hitelesítés
  * Fájl: js/auth.js
  */
 
 const Auth = {
-    // Jelenleg bejelentkezett felhasználó lekérése
+    // Jelenleg bejelentkezett felhasználó lekérése LocalStorage-ból
     getCurrentUser() {
         const userStr = localStorage.getItem('drugassist_user');
         if (!userStr) return null;
@@ -16,7 +16,7 @@ const Auth = {
         }
     },
 
-    // Munkamenet-védelem az oldalakra
+    // Munkamenet-védelem az oldalakhoz
     requireAuth() {
         const user = this.getCurrentUser();
         if (!user) {
@@ -26,7 +26,7 @@ const Auth = {
         return user;
     },
 
-    // Bejelentkezési logika Supabase alapon
+    // Bejelentkezés a profiles tábla alapján
     async login(username, password) {
         if (!username || !password) {
             return { success: false, message: "Kérjük, adja meg a felhasználónevet és a jelszót!" };
@@ -37,10 +37,10 @@ const Auth = {
                 return { success: false, message: "Hiba: A Supabase kapcsolat nem érhető el!" };
             }
 
-            // 1. Profil lekérése felhasználónév alapján
+            // 1. Felhasználó és jelszó pontos lekérdezése a profiles táblából
             const { data: profile, error } = await window.supabaseClient
                 .from('profiles')
-                .select('*')
+                .select('id, username, full_name, password, default_department, default_role')
                 .eq('username', username)
                 .single();
 
@@ -48,15 +48,22 @@ const Auth = {
                 return { success: false, message: "Hibás felhasználónév vagy jelszó!" };
             }
 
-            // 2. Szerepkörök lekérése a user_roles táblából
+            // 2. Jelszó egyezőség ellenőrzése
+            if (profile.password !== password) {
+                return { success: false, message: "Hibás felhasználónév vagy jelszó!" };
+            }
+
+            // 3. Szerepkörök lekérése a user_roles táblából
             const { data: rolesData } = await window.supabaseClient
                 .from('user_roles')
                 .select('role')
                 .eq('user_id', profile.id);
 
-            const userRoles = rolesData ? rolesData.map(r => r.role) : [profile.default_role];
+            const userRoles = (rolesData && rolesData.length > 0) 
+                ? rolesData.map(r => r.role) 
+                : [profile.default_role];
 
-            // Mentés a munkamenetbe
+            // 4. Munkamenet elmentése
             const userData = {
                 id: profile.id,
                 username: profile.username,
@@ -71,7 +78,7 @@ const Auth = {
 
         } catch (err) {
             console.error("Bejelentkezési hiba:", err);
-            return { success: false, message: "Hiba történt a bejelentkezés során!" };
+            return { success: false, message: "Rendszerhiba történt a bejelentkezés során!" };
         }
     },
 
@@ -81,7 +88,7 @@ const Auth = {
         window.location.href = 'index.html';
     },
 
-    // Aktív szerepkör vagy osztály frissítése
+    // Munkamenet kontextus frissítése (szerepkör / osztály)
     updateContext(newRole, newDepartment) {
         const user = this.getCurrentUser();
         if (user) {
@@ -92,7 +99,7 @@ const Auth = {
     }
 };
 
-// Auto-bind a login gombra az index.html-en
+// Automatikus eseménykezelő az index.html-en lévő gombra
 document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('loginButton');
     if (loginBtn) {
