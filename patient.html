@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrugAssist - Beteg</title>
+
+<!-- Supabase SDK & Config -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 18px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 { margin: 0; font-size: 22px; }
+.user-info { color: #666; font-size: 14px; }
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 32px;
+}
+
+.back { margin-bottom: 24px; }
+.back a { text-decoration: none; color: #1976d2; font-weight: 600; }
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.05);
+}
+
+.patient-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.patient-data {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    row-gap: 10px;
+}
+
+.label { color: #666; }
+
+.action-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.action-card {
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+button {
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    cursor: pointer;
+    font-size: 15px;
+}
+
+button:hover { background: #1565c0; }
+
+#scannerInput {
+    width: 220px;
+    padding: 6px;
+    font-size: 16px;
+    text-align: center;
+}
+
+#patientNote {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    resize: vertical;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.complete {
+    display: flex;
+    justify-content: center;
+    margin-top: 28px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist</h1>
+    <div class="user-info">
+        <span id="userName">Dr. Kovács Anna</span> | <span id="dateTime"></span>
+    </div>
+</header>
+
+<div class="container">
+
+<div class="back">
+    <a href="ward.html">← Vissza az osztályhoz</a>
+</div>
+
+<!-- BETEG ADATOK -->
+<section class="card">
+    <div class="patient-name">
+        <span id="patientName">Kovács János</span>
+    </div>
+    <div class="patient-data">
+        <div class="label">Azonosító</div>
+        <div id="patientId">TAJ: 123 456 789</div>
+        <div class="label">Osztály</div>
+        <div id="patientWard">Belgyógyászat</div>
+        <div class="label">Ágy</div>
+        <div id="patientBed">12/B</div>
+        <div class="label">Készítési azonosító</div>
+        <div id="preparationId">DA-20261008-1002</div>
+    </div>
+</section>
+
+<div class="action-row">
+    <!-- CÍMKE -->
+    <section class="card action-card">
+        <h2>🖨 Betegazonosító címke</h2>
+        <button id="printLabelButton">Címke nyomtatása</button>
+    </section>
+
+    <!-- PDF -->
+    <section class="card action-card">
+        <h2>📄 Gyógyszerelési lista</h2>
+        <button class="file-button">📂 PDF megtekintése</button>
+    </section>
+
+    <!-- VONALKÓD BEOLVASÁS -->
+    <section class="card action-card">
+        <h2>📦 Vonalkód beolvasás</h2>
+        <input id="scannerInput" type="text" placeholder="Vonalkód..." autocomplete="off">
+    </section>
+</div>
+
+<!-- GYÓGYSZEREK -->
+<section class="card">
+    <h2>💊 Gyógyszerek</h2>
+    <div id="medicationList">
+        <p>A gyógyszerelési tételek itt fognak megjelenni.</p>
+    </div>
+</section>
+
+<!-- MEGJEGYZÉS -->
+<div class="card">
+    <h3>📝 Megjegyzés</h3>
+    <textarea id="patientNote" rows="4" placeholder="A megjegyzés szövege..."></textarea>
+</div>
+
+<!-- LEZÁRÁS -->
+<div class="complete">
+    <button id="completeButton">Gyógyszerelés lezárása</button>
+</div>
+
+</div>
+
+<script>
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateDateTime();
+setInterval(updateDateTime, 10000);
+</script>
+
+</body>
+</html>
