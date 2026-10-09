@@ -585,38 +585,35 @@ async function saveBatchAndConfirm() {
     }
 
     const currentItem = prescriptionItems[currentScanningItemIndex];
-    const drugName = currentScanningDrug ? currentScanningDrug.brand_name.trim() : '';
+    // Ha a currentScanningDrug nem érhető el, a tétel mentett nevével próbálkozunk
+    const pupha = currentItem ? currentItem.pupha_master : null;
+    const drugName = (currentScanningDrug && currentScanningDrug.brand_name) 
+        || (currentItem ? (currentItem.substituted_name || (pupha ? pupha.brand_name : '')) : '').trim();
+
+    const tttCode = (currentScanningDrug && currentScanningDrug.ttt_code) 
+        || (pupha ? pupha.ttt_code : null);
+
+    console.log("Sarzs mentése a következő adatokkal:", { drugName, tttCode, lot, exp });
 
     try {
-        // 1. Ellenőrizzük, létezik-e már ez a sarzs az inventory_batches törzsben
-        const { data: existingBatch, error: selectErr } = await window.supabaseClient
+        // 1. Közvetlen beszúrás/frissítés az inventory_batches táblába
+        const batchPayload = {
+            drug_name: drugName,
+            ttt_code: tttCode,
+            lot_number: lot,
+            expiry_date: exp
+        };
+
+        const { data: batchData, error: batchErr } = await window.supabaseClient
             .from('inventory_batches')
-            .select('id')
-            .ilike('drug_name', drugName)
-            .eq('lot_number', lot)
-            .maybeSingle();
+            .insert([batchPayload])
+            .select();
 
-        if (selectErr) {
-            console.warn("Lekérdezési figyelmeztetés:", selectErr);
-        }
-
-        if (!existingBatch) {
-            // Beszúrás az inventory_batches táblába
-            const { error: insertErr } = await window.supabaseClient
-                .from('inventory_batches')
-                .insert({
-                    drug_name: drugName,
-                    ttt_code: currentScanningDrug ? currentScanningDrug.ttt_code || null : null,
-                    lot_number: lot,
-                    expiry_date: exp
-                });
-
-            if (insertErr) {
-                console.error("inventory_batches beszúrási hiba:", insertErr);
-                alert(`Figyelem: Az törzs-sarzs elmentése nem sikerült: ${insertErr.message}`);
-            } else {
-                console.log("Új sarzs sikeresen rögzítve az inventory_batches törzsben!");
-            }
+        if (batchErr) {
+            console.error("inventory_batches beszúrási hiba:", batchErr);
+            alert(`Hiba az inventory_batches táblába mentéskor:\n${batchErr.message} (Kód: ${batchErr.code})`);
+        } else {
+            console.log("Sikeresen elmentve az inventory_batches táblába:", batchData);
         }
 
         // 2. Mentés a konkrét beteg igényléséhez (prescription_items tábla)
@@ -631,12 +628,12 @@ async function saveBatchAndConfirm() {
 
             if (itemErr) {
                 console.error("prescription_items sarzs mentési hiba:", itemErr);
-                alert(`Figyelem: A tételsorhoz nem sikerült elmenteni a sarzsot: ${itemErr.message}`);
             }
         }
 
     } catch (e) {
-        console.error("Hiba a sarzs mentése során:", e);
+        console.error("Kivétel a sarzs mentése során:", e);
+        alert(`Váratlan hiba: ${e.message || e}`);
     }
 
     // Tétel frissítése az oldalon a memóriában is
