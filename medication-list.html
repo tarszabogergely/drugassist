@@ -137,24 +137,27 @@ async function loadMedicationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. Reviewed (gyógyszerész által jóváhagyott) igénylések lekérése
+        // 1. Reviewed (jóváhagyott) igénylések és a hozzájuk tartozó betegek lekérése
         const { data: prescriptions, error } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, updated_at, patient_id, patients(name, room_bed, department), prescription_items(id)')
+            .select('id, updated_at, created_at, patient_id, patients(name, room_bed, department)')
             .eq('status', 'reviewed')
-            .order('updated_at', { ascending: true });
+            .order('updated_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase lekérdezési hiba:", error);
+            throw error;
+        }
 
         if (!prescriptions || prescriptions.length === 0) {
-            container.innerHTML = '<div class="empty-msg">Jelenleg nincs gyógyszerelésre és tálcázásra váró feladott igénylés.</div>';
+            container.innerHTML = '<div class="empty-msg">Jelenleg nincs gyógyszerelésre / tálcázásra váró feladott igénylés.</div>';
             return;
         }
 
         // 2. Csoportosítás osztályok szerint
         const groupedByDept = {};
         prescriptions.forEach(p => {
-            const dept = p.patients ? p.patients.department : 'Ismeretlen';
+            const dept = (p.patients && p.patients.department) ? p.patients.department : 'Központi Osztály';
             if (!groupedByDept[dept]) {
                 groupedByDept[dept] = [];
             }
@@ -176,7 +179,7 @@ async function loadMedicationList() {
                                 <th>Beteg neve</th>
                                 <th>Ágy</th>
                                 <th>Jóváhagyva</th>
-                                <th>Gyógyszersorok</th>
+                                <th>Státusz</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -184,17 +187,17 @@ async function loadMedicationList() {
             `;
 
             list.forEach(p => {
-                const timeStr = new Date(p.updated_at || p.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
-                const itemCount = p.prescription_items ? p.prescription_items.length : 0;
-                const patientName = p.patients ? p.patients.name : 'Ismeretlen';
-                const bed = p.patients ? p.patients.room_bed : '-';
+                const timeSource = p.updated_at || p.created_at;
+                const timeStr = timeSource ? new Date(timeSource).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const patientName = (p.patients && p.patients.name) ? p.patients.name : 'Ismeretlen beteg';
+                const bed = (p.patients && p.patients.room_bed) ? p.patients.room_bed : '-';
 
                 html += `
                     <tr>
                         <td><strong>${patientName}</strong></td>
                         <td>${bed}</td>
                         <td>${timeStr}</td>
-                        <td>${itemCount} tétel</td>
+                        <td><span style="color:#2e7d32; font-weight:600;">✓ Jóváhagyva</span></td>
                         <td style="text-align: right;">
                             <button class="action-btn" onclick="location.href='patient.html?patientId=${p.patient_id}&prescriptionId=${p.id}'">Gyógyszerelés</button>
                         </td>
@@ -213,7 +216,7 @@ async function loadMedicationList() {
 
     } catch (err) {
         console.error("Hiba a lista betöltésekor:", err);
-        container.innerHTML = '<div class="empty-msg">Hiba történt az adatok betöltése során.</div>';
+        container.innerHTML = '<div class="empty-msg">Hiba történt az adatok betöltése során. Kérjük, ellenőrizze a hálózati kapcsolatot!</div>';
     }
 }
 
