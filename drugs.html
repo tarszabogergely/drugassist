@@ -133,6 +133,15 @@ tr.drug-row:hover { background-color: #f0f7ff; }
     border-radius: 12px;
 }
 
+.batch-tag {
+    background: #e2e8f0;
+    color: #1e293b;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
 /* MODAL */
 .modal-overlay {
     display: none;
@@ -178,9 +187,14 @@ tr.drug-row:hover { background-color: #f0f7ff; }
 
 .modal-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 20px;
+}
+
+.modal-actions-right {
+    display: flex;
+    gap: 12px;
 }
 
 button.btn-primary {
@@ -205,6 +219,18 @@ button.btn-secondary {
     cursor: pointer;
 }
 
+button.btn-danger {
+    background: #dc2626;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+button.btn-danger:hover { background: #b91c1c; }
+
 .loading-msg {
     padding: 30px;
     text-align: center;
@@ -227,13 +253,14 @@ button.btn-secondary {
 
 <!-- FÜLEK -->
 <div class="tab-bar">
-    <button id="tabLocal" class="tab-btn active" onclick="switchTab('local')">📦 Patikai / Helyi Törzs</button>
-    <button id="tabPupha" class="tab-btn" onclick="switchTab('pupha')">🏛️ PuPha Törzs (5000+ Gyógyszer)</button>
+    <button id="tabInventory" class="tab-btn active" onclick="switchTab('inventory')">1, Készlet</button>
+    <button id="tabLocal" class="tab-btn" onclick="switchTab('local')">2, Patikai törzs</button>
+    <button id="tabPupha" class="tab-btn" onclick="switchTab('pupha')">3, PuPha törzs</button>
 </div>
 
 <!-- KERESŐ -->
 <div class="search-bar-container">
-    <input type="text" id="searchInput" class="search-input" placeholder="Gyógyszernév, hatóanyag, ATC kód vagy vonalkód keresése..." oninput="debounceSearch()">
+    <input type="text" id="searchInput" class="search-input" placeholder="Gyógyszernév, gyári szám, hatóanyag vagy kód keresése..." oninput="debounceSearch()">
 </div>
 
 <!-- TÁBLÁZAT -->
@@ -253,7 +280,7 @@ button.btn-secondary {
 <!-- SZERKESZTŐ MODAL -->
 <div id="editModal" class="modal-overlay">
     <div class="modal-card">
-        <h3 id="modalTitle" style="margin-top:0; color:#1e293b;">Gyógyszer Adatainak Szerkesztése</h3>
+        <h3 id="modalTitle" style="margin-top:0; color:#1e293b;">Adatok Szerkesztése</h3>
         
         <form id="editForm" onsubmit="event.preventDefault(); saveDrugChanges();">
             <input type="hidden" id="editDrugId">
@@ -263,51 +290,73 @@ button.btn-secondary {
                 <input type="text" id="editBrandName" required>
             </div>
 
-            <div class="form-group">
-                <label>Hatóanyag</label>
-                <input type="text" id="editIngredient">
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-                <div class="form-group">
-                    <label>ATC Kód</label>
-                    <input type="text" id="editAtcCode">
-                </div>
-                <div class="form-group">
-                    <label>TTT Kód</label>
-                    <input type="text" id="editTttCode">
+            <!-- Készletspecifikus mezők -->
+            <div id="inventoryFields" style="display:none;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label>Gyári szám (LOT)</label>
+                        <input type="text" id="editLotNumber">
+                    </div>
+                    <div class="form-group">
+                        <label>Lejárati dátum (EXP)</label>
+                        <input type="date" id="editExpiryDate">
+                    </div>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>Kiszerelés / Alaktag (Morphology)</label>
-                <input type="text" id="editMorphology">
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+            <!-- Törzsadat mezők -->
+            <div id="masterFields">
                 <div class="form-group">
-                    <label>Vonalkód (EAN / EKEIDR)</label>
-                    <input type="text" id="editBarcode">
+                    <label>Hatóanyag</label>
+                    <input type="text" id="editIngredient">
                 </div>
-                <div id="activeGroup" class="form-group">
-                    <label>Státusz</label>
-                    <select id="editIsActive">
-                        <option value="true">✓ Aktív készleten</option>
-                        <option value="false">✖ Inaktív / Hiánycikk</option>
-                    </select>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label>ATC Kód</label>
+                        <input type="text" id="editAtcCode">
+                    </div>
+                    <div class="form-group">
+                        <label>TTT Kód</label>
+                        <input type="text" id="editTttCode">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Kiszerelés / Alaktag (Morphology)</label>
+                    <input type="text" id="editMorphology">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label>Vonalkód (EAN / EKEIDR)</label>
+                        <input type="text" id="editBarcode">
+                    </div>
+                    <div id="activeGroup" class="form-group">
+                        <label>Státusz</label>
+                        <select id="editIsActive">
+                            <option value="true">✓ Aktív készleten</option>
+                            <option value="false">✖ Inaktív / Hiánycikk</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="btn-secondary" onclick="closeEditModal()">Mégse</button>
-                <button type="submit" class="btn-primary">✓ Módosítások Mentése</button>
+                <div>
+                    <button type="button" id="deleteBtn" class="btn-danger" style="display:none;" onclick="deleteInventoryItem()">🗑 Törlés</button>
+                </div>
+                <div class="modal-actions-right">
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Mégse</button>
+                    <button type="submit" class="btn-primary">✓ Módosítások Mentése</button>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-let currentTab = 'local'; // 'local' vagy 'pupha'
+let currentTab = 'inventory'; // 'inventory', 'local' vagy 'pupha'
 let drugItems = [];
 let searchTimeout = null;
 
@@ -318,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function switchTab(tab) {
     currentTab = tab;
+    document.getElementById("tabInventory").className = tab === 'inventory' ? 'tab-btn active' : 'tab-btn';
     document.getElementById("tabLocal").className = tab === 'local' ? 'tab-btn active' : 'tab-btn';
     document.getElementById("tabPupha").className = tab === 'pupha' ? 'tab-btn active' : 'tab-btn';
     document.getElementById("searchInput").value = '';
@@ -341,7 +391,30 @@ async function loadDrugsData() {
     tbody.innerHTML = '<tr><td colspan="6" class="loading-msg">Adatok betöltése...</td></tr>';
 
     try {
-        if (currentTab === 'local') {
+        if (currentTab === 'inventory') {
+            thead.innerHTML = `
+                <tr>
+                    <th>Gyógyszernév</th>
+                    <th>Gyári szám (LOT)</th>
+                    <th>Lejárati dátum (EXP)</th>
+                    <th>TTT Kód</th>
+                    <th style="text-align:right;">Műveletek</th>
+                </tr>
+            `;
+
+            let query = window.supabaseClient.from('inventory_batches').select('*');
+
+            if (searchTerm) {
+                query = query.or(`drug_name.ilike.%${searchTerm}%,lot_number.ilike.%${searchTerm}%,batch_number.ilike.%${searchTerm}%,ttt_code.ilike.%${searchTerm}%`);
+            }
+
+            const { data, error } = await query.order('drug_name', { ascending: true }).limit(200);
+            if (error) throw error;
+            drugItems = data || [];
+
+            renderInventoryTable(drugItems);
+
+        } else if (currentTab === 'local') {
             thead.innerHTML = `
                 <tr>
                     <th>Gyógyszernév</th>
@@ -394,7 +467,36 @@ async function loadDrugsData() {
     }
 }
 
-// Helyi törzs táblázat kirajzolása
+// 1, Készlet (inventory_batches) táblázat kirajzolása
+function renderInventoryTable(items) {
+    const tbody = document.getElementById("tableBody");
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b; padding:24px;">Nincs rögzített sarzs a készletben.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    items.forEach((item, idx) => {
+        const lotVal = item.lot_number || item.batch_number || '-';
+        const expVal = item.expiry_date || item.expiration_date || '-';
+
+        html += `
+            <tr class="drug-row" onclick="openEditModal(${idx})">
+                <td><strong style="color:#1e293b; font-size:15px;">${item.drug_name}</strong></td>
+                <td><span class="batch-tag">LOT: ${lotVal}</span></td>
+                <td style="color:#1565c0; font-weight:600;">EXP: ${expVal}</td>
+                <td style="font-family:monospace; color:#475569;">${item.ttt_code || '-'}</td>
+                <td style="text-align:right;">
+                    <button class="btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="event.stopPropagation(); openEditModal(${idx});">Szerkesztés</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// 2, Patikai törzs táblázat kirajzolása
 function renderLocalTable(items) {
     const tbody = document.getElementById("tableBody");
     if (!items || items.length === 0) {
@@ -422,7 +524,7 @@ function renderLocalTable(items) {
     tbody.innerHTML = html;
 }
 
-// PuPha törzs táblázat kirajzolása
+// 3, PuPha törzs táblázat kirajzolása
 function renderPuphaTable(items) {
     const tbody = document.getElementById("tableBody");
     if (!items || items.length === 0) {
@@ -452,19 +554,38 @@ function openEditModal(index) {
     if (!item) return;
 
     document.getElementById("editDrugId").value = item.id;
-    document.getElementById("editBrandName").value = item.brand_name || '';
-    document.getElementById("editIngredient").value = item.active_ingredient || '';
-    document.getElementById("editAtcCode").value = item.atc_code || '';
-    document.getElementById("editTttCode").value = item.ttt_code || '';
-    document.getElementById("editMorphology").value = item.morphology || item.package_size || '';
-    document.getElementById("editBarcode").value = item.barcode || '';
+    const deleteBtn = document.getElementById("deleteBtn");
 
-    const activeGroup = document.getElementById("activeGroup");
-    if (currentTab === 'local') {
-        activeGroup.style.display = 'block';
-        document.getElementById("editIsActive").value = (item.is_active !== false).toString();
+    if (currentTab === 'inventory') {
+        document.getElementById("modalTitle").innerText = "Készlet-sarzs Szerkesztése";
+        document.getElementById("editBrandName").value = item.drug_name || '';
+        document.getElementById("editLotNumber").value = item.lot_number || item.batch_number || '';
+        document.getElementById("editExpiryDate").value = item.expiry_date || item.expiration_date || '';
+
+        document.getElementById("inventoryFields").style.display = 'block';
+        document.getElementById("masterFields").style.display = 'none';
+        deleteBtn.style.display = 'inline-block';
+
     } else {
-        activeGroup.style.display = 'none';
+        document.getElementById("modalTitle").innerText = "Gyógyszer Adatainak Szerkesztése";
+        document.getElementById("editBrandName").value = item.brand_name || '';
+        document.getElementById("editIngredient").value = item.active_ingredient || '';
+        document.getElementById("editAtcCode").value = item.atc_code || '';
+        document.getElementById("editTttCode").value = item.ttt_code || '';
+        document.getElementById("editMorphology").value = item.morphology || item.package_size || '';
+        document.getElementById("editBarcode").value = item.barcode || '';
+
+        document.getElementById("inventoryFields").style.display = 'none';
+        document.getElementById("masterFields").style.display = 'block';
+        deleteBtn.style.display = 'none';
+
+        const activeGroup = document.getElementById("activeGroup");
+        if (currentTab === 'local') {
+            activeGroup.style.display = 'block';
+            document.getElementById("editIsActive").value = (item.is_active !== false).toString();
+        } else {
+            activeGroup.style.display = 'none';
+        }
     }
 
     document.getElementById("editModal").style.display = 'flex';
@@ -478,14 +599,31 @@ function closeEditModal() {
 async function saveDrugChanges() {
     const drugId = document.getElementById("editDrugId").value;
     const brandName = document.getElementById("editBrandName").value.trim();
-    const activeIngredient = document.getElementById("editIngredient").value.trim();
-    const atcCode = document.getElementById("editAtcCode").value.trim();
-    const tttCode = document.getElementById("editTttCode").value.trim();
-    const morphology = document.getElementById("editMorphology").value.trim();
-    const barcode = document.getElementById("editBarcode").value.trim();
 
     try {
-        if (currentTab === 'local') {
+        if (currentTab === 'inventory') {
+            const lot = document.getElementById("editLotNumber").value.trim();
+            const exp = document.getElementById("editExpiryDate").value;
+
+            const { error } = await window.supabaseClient
+                .from('inventory_batches')
+                .update({
+                    drug_name: brandName,
+                    lot_number: lot,
+                    batch_number: lot,
+                    expiry_date: exp,
+                    expiration_date: exp
+                })
+                .eq('id', drugId);
+
+            if (error) throw error;
+
+        } else if (currentTab === 'local') {
+            const activeIngredient = document.getElementById("editIngredient").value.trim();
+            const atcCode = document.getElementById("editAtcCode").value.trim();
+            const tttCode = document.getElementById("editTttCode").value.trim();
+            const morphology = document.getElementById("editMorphology").value.trim();
+            const barcode = document.getElementById("editBarcode").value.trim();
             const isActive = document.getElementById("editIsActive").value === 'true';
 
             const { error } = await window.supabaseClient
@@ -504,6 +642,11 @@ async function saveDrugChanges() {
             if (error) throw error;
 
         } else {
+            const activeIngredient = document.getElementById("editIngredient").value.trim();
+            const atcCode = document.getElementById("editAtcCode").value.trim();
+            const tttCode = document.getElementById("editTttCode").value.trim();
+            const morphology = document.getElementById("editMorphology").value.trim();
+
             const { error } = await window.supabaseClient
                 .from('pupha_master')
                 .update({
@@ -524,7 +667,32 @@ async function saveDrugChanges() {
 
     } catch (err) {
         console.error("Hiba a mentés során:", err);
-        alert("Hiba történt a módosítások mentésekor!");
+        alert("Hiba történt a módosítások mentésekor: " + (err.message || err));
+    }
+}
+
+// SARZS TÖRLÉSE KÉSZLETBŐL
+async function deleteInventoryItem() {
+    const drugId = document.getElementById("editDrugId").value;
+    if (!drugId) return;
+
+    const confirmDelete = confirm("Biztosan törölni szeretné ezt a sarzsot a készletből?");
+    if (!confirmDelete) return;
+
+    try {
+        const { error } = await window.supabaseClient
+            .from('inventory_batches')
+            .delete()
+            .eq('id', drugId);
+
+        if (error) throw error;
+
+        alert("Sarzs sikeresen törölve a készletből!");
+        closeEditModal();
+        loadDrugsData();
+    } catch (err) {
+        console.error("Hiba a törlés során:", err);
+        alert("Hiba történt a törlés során: " + (err.message || err));
     }
 }
 
