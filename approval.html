@@ -649,7 +649,8 @@ function filterLocalList(searchTerm) {
 function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
     const item = prescriptionItems[selectedItemIndex];
     if (item) {
-        item.local_drug_id = localDrugId;
+        // Ha van localDrugId, elmentjük, egyébként null
+        item.local_drug_id = localDrugId || null;
         item.substituted_name = newBrandName;
         item.substituted_ingredient = newIngredient;
         alert(`Helyettesítve erre: ${newBrandName}`);
@@ -684,8 +685,8 @@ async function approvePrescription() {
     try {
         const user = Auth.getCurrentUser();
 
-        // 1. Módosított/Helyettesített tételek mentése párhuzamosan (Promise.all)
-        const updatePromises = prescriptionItems.map(item => {
+        // 1. Módosított/Helyettesített tételek mentése
+        for (const item of prescriptionItems) {
             const updatePayload = {
                 substituted_name: item.substituted_name || null,
                 substituted_ingredient: item.substituted_ingredient || null,
@@ -695,25 +696,23 @@ async function approvePrescription() {
                 dose_night: parseFloat(item.dose_night) || 0
             };
 
-            // Csak akkor küldjük a local_drug_id-t, ha valóban ki lett választva helyettesítő
-            if (item.local_drug_id) {
+            // UUID típus esetén kizárólag érvényes UUID-t vagy null-t küldünk!
+            if (item.local_drug_id && item.local_drug_id !== '') {
                 updatePayload.local_drug_id = item.local_drug_id;
+            } else {
+                updatePayload.local_drug_id = null;
             }
 
-            return window.supabaseClient
+            const { error: itemErr } = await window.supabaseClient
                 .from('prescription_items')
                 .update(updatePayload)
                 .eq('id', item.id);
-        });
 
-        const results = await Promise.all(updatePromises);
-
-        // Ellenőrizzük, hogy volt-e hiba a tételek mentésekor
-        const itemErrors = results.filter(r => r.error);
-        if (itemErrors.length > 0) {
-            console.error("Hiba a tételek mentésekor:", itemErrors);
-            alert("Hiba történt a tételek mentése során! Ellenőrizze a konzolt.");
-            return;
+            if (itemErr) {
+                console.error("Tétel mentési hiba:", itemErr);
+                alert(`Hiba a(z) ${item.substituted_name || 'gyógyszer'} mentésekor:\n${itemErr.message} (Kód: ${itemErr.code})`);
+                return; // Megállítjuk a folyamatot, ha hiba van
+            }
         }
 
         // 2. Igénylés lezárása / státusz frissítése
@@ -736,7 +735,6 @@ async function approvePrescription() {
         alert(`Hiba történt a mentés során: ${e.message || e}`);
     }
 }
-
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
