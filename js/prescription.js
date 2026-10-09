@@ -133,9 +133,9 @@ const Prescription = {
             pupha_id: id,
             name: name,
             atc: atc,
-            morning: 1,
+            morning: 0,
             noon: 0,
-            evening: 1,
+            evening: 0,
             night: 0,
             isOwn: false,
             originalOrder: `${name} (1-0-1-0)` // Alapértelmezett elrendelt szöveg rögzítése
