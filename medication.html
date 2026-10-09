@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrugAssist – Tálcázás & Gyógyszerelés</title>
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 18px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 { margin: 0; font-size: 22px; color: #1565c0; }
+.user-info { color: #666; font-size: 14px; }
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 32px;
+}
+
+.back { margin-bottom: 24px; }
+.back a { text-decoration: none; color: #1976d2; font-weight: 600; }
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.05);
+}
+
+.patient-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.patient-data {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    row-gap: 10px;
+    margin-top: 15px;
+    font-size: 15px;
+}
+
+.label { color: #64748b; font-weight: 600; }
+
+/* 2 KÁRTYÁS ELRENDEZÉS */
+.action-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.action-card {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 16px;
+    transition: 0.2s;
+}
+
+.action-card h2 { margin-top: 0; font-size: 15px; color: #334155; }
+
+button {
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+button:hover { background: #1565c0; }
+
+#scannerInput {
+    width: 220px;
+    padding: 10px;
+    font-size: 15px;
+    text-align: center;
+    border-radius: 8px;
+    border: 2px solid #1976d2;
+    outline: none;
+}
+
+/* GYÓGYSZER TÁBLÁZAT */
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+}
+
+th, td { padding: 12px 14px; text-align: left; font-size: 14px; }
+th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+
+.row-in-stock {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* VONALKÓD KIEMELÉSEK */
+.row-scanned-active {
+    outline: 3px solid #fbc02d !important; /* Sárga keret */
+    background-color: #fffde7 !important;
+    box-shadow: 0 0 10px rgba(251, 192, 45, 0.5);
+}
+
+.row-scanned-completed {
+    background-color: #f0fdf4 !important; /* Halvány zöld background */
+}
+
+.check-mark {
+    color: #2e7d32;
+    font-weight: 900;
+    font-size: 18px;
+    margin-left: 6px;
+}
+
+.dose-cell {
+    text-align: center;
+    font-weight: bold;
+    color: #0f172a;
+}
+
+.batch-info {
+    font-size: 12px;
+    color: #1e293b;
+    background: #e2e8f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+/* MEGJEGYZÉS DOBOZ */
+.note-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.note-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+}
+
+/* MODAL */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-card {
+    background: white;
+    width: 520px;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.batch-list {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.batch-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.batch-item:hover { background: #f0f7ff; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; }
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Tálcázás & Gyógyszerelés</h1>
+    <div class="user-info">
+        <span id="userName">Asszisztens</span> | <span id="dateTime"></span>
+    </div>
+</header>
+
+<div class="container">
+
+<div class="back">
+    <a href="medication-list.html">← Vissza a gyógyszerelésre váró listához</a>
+</div>
+
+<!-- BETEG ADATOK -->
+<section class="card">
+    <div class="patient-name">
+        <span id="patientName">Beteg betöltése...</span>
+    </div>
+    <div class="patient-data">
+        <div class="label">Azonosító</div>
+        <div id="patientTaj">-</div>
+        <div class="label">Születési dátum</div>
+        <div id="patientBirthDate">-</div>
+        <div class="label">Osztály</div>
+        <div id="patientWard">-</div>
+        <div class="label">Ágy</div>
+        <div id="patientBed">-</div>
+        <div class="label">Készítési azonosító</div>
+        <div id="preparationId" style="font-weight: bold; color: #1976d2;">-</div>
+    </div>
+</section>
+
+<!-- 2 KÁRTYÁS MŰVELETI SÁV -->
+<div class="action-row">
+    <!-- CÍMKE -->
+    <section class="card action-card">
+        <h2>🖨 Címke Nyomtatása</h2>
+        <button id="printLabelButton" onclick="window.print()">Címke nyomtatása</button>
+    </section>
+
+    <!-- VONALKÓD BEOLVASÁS -->
+    <section class="card action-card">
+        <h2>📦 Vonalkód Beolvasás (Csippantás)</h2>
+        <input id="scannerInput" type="text" placeholder="Beolvasás..." autocomplete="off" onchange="processBarcodeScan(this.value)">
+    </section>
+</div>
+
+<!-- GYÓGYSZEREK -->
+<section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin:0;">💊 Tálcázandó Gyógyszerelési Tételek</h2>
+        <div style="font-size:13px; color:#64748b;">Olvassa be a gyógyszer vonalkódját a tálcázáshoz</div>
+    </div>
+    <div id="medicationList">
+        <p style="color:#64748b;">Tételek betöltése...</p>
+    </div>
+</section>
+
+<!-- MEGJEGYZÉS DOBOZ (CSAK OLVASHATÓ / PATIKAI UTA SÍTÁS) -->
+<div class="card note-container">
+    <h3 style="margin:0 0 4px 0; font-size:16px; color:#334155;">📝 Patikai megjegyzés / utasítás</h3>
+    <textarea id="patientNote" class="note-input" rows="2" readonly placeholder="Nincs patikai megjegyzés."></textarea>
+</div>
+
+<!-- LEZÁRÁS -->
+<div style="display:flex; justify-content:center; margin-top:28px;">
+    <button id="completeButton" style="padding:14px 36px; font-size:16px; background:#2e7d32;" onclick="finishMedication()">✓ Gyógyszerelés Lezárása</button>
+</div>
+
+</div>
+
+<!-- GYÁRI SZÁM ÉS LEJÁRAT (BATCH) MODAL -->
+<div id="batchModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 id="batchModalTitle" style="margin-top:0; color:#1e293b;">Gyári szám (LOT) & Lejárat (EXP) rögzítése</h3>
+        
+        <div id="existingBatchesSection">
+            <label style="font-size:12px; font-weight:600; color:#64748b; margin-bottom:6px; display:block;">Korábban rögzített gyári számok (Kattintson a kiválasztáshoz):</label>
+            <div id="existingBatchesList" class="batch-list">
+                <!-- JS Tölti fel -->
+            </div>
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0; padding-top:12px; margin-top:6px;">
+            <strong style="font-size:13px; color:#334155; display:block; margin-bottom:10px;">Vagy adjon meg új adatokat:</strong>
+            <div class="form-group">
+                <label>Gyári szám / LOT *</label>
+                <input type="text" id="inputLotNumber" placeholder="pl. LOT123456">
+            </div>
+            <div class="form-group">
+                <label>Lejárati dátum / EXP *</label>
+                <input type="date" id="inputExpiryDate">
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button onclick="closeBatchModal()" style="background:#f1f5f9; color:#475569;">Mégse</button>
+            <button onclick="saveBatchAndConfirm()" style="background:#1976d2;">✓ Rögzítés & Becsippantás</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPrescriptionId = null;
+let prescriptionItems = [];
+let localInventory = [];
+let lastScannedIndex = null;
+let scannedIndices = new Set();
+let itemBatchMap = {}; // Tétel index -> {lot_number, expiry_date}
+let currentScanningItemIndex = null;
+let currentScanningDrug = null;
+
+document.addEventListener("DOMContentLoaded", async () => {
+    Auth.requireAuth();
+    await loadLocalInventory();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get('patientId');
+    currentPrescriptionId = urlParams.get('prescriptionId');
+
+    if (patientId) {
+        await loadPatientAndPrescription(patientId, currentPrescriptionId);
+    }
+});
+
+async function loadLocalInventory() {
+    try {
+        const { data } = await window.supabaseClient
+            .from('local_inventory_master')
+            .select('*')
+            .eq('is_active', true);
+        localInventory = data || [];
+    } catch (e) {
+        console.error("Hiba a helyi készlet betöltésekor:", e);
+    }
+}
+
+async function loadPatientAndPrescription(patientId, prescriptionId) {
+    try {
+        const { data: patient } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .eq('id', patientId)
+            .single();
+
+        if (patient) {
+            document.getElementById("patientName").innerText = patient.name;
+            document.getElementById("patientTaj").innerText = patient.taj || '-';
+            
+            if (patient.birth_date) {
+                const bDate = new Date(patient.birth_date);
+                const formattedDate = bDate.toLocaleDateString('hu-HU');
+                const today = new Date();
+                let age = today.getFullYear() - bDate.getFullYear();
+                const m = today.getMonth() - bDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
+                document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+            } else {
+                document.getElementById("patientBirthDate").innerText = '-';
+            }
+
+            document.getElementById("patientWard").innerText = patient.department || '-';
+            document.getElementById("patientBed").innerText = patient.room_bed || '-';
+        }
+
+        let query = window.supabaseClient
+            .from('prescriptions')
+            .select('*, prescription_items(*, pupha_master(*))')
+            .eq('patient_id', patientId);
+
+        if (prescriptionId) {
+            query = query.eq('id', prescriptionId);
+        } else {
+            query = query.order('created_at', { ascending: false }).limit(1);
+        }
+
+        const { data: pData } = await query;
+        const prescription = pData && pData.length > 0 ? pData[0] : null;
+
+        if (prescription) {
+            currentPrescriptionId = prescription.id;
+            document.getElementById("preparationId").innerText = prescription.barcode || 'DA-20261009-0001';
+            document.getElementById("patientNote").value = prescription.pharmacy_notes || '';
+
+            prescriptionItems = prescription.prescription_items || [];
+            renderMedicationTable();
+        }
+    } catch (err) {
+        console.error("Hiba az adatok betöltésekor:", err);
+    }
+}
+
+// GYÓGYSZERTÁBLÁZAT KIRAJZOLÁSA
+function renderMedicationTable() {
+    const container = document.getElementById("medicationList");
+    if (!prescriptionItems || prescriptionItems.length === 0) {
+        container.innerHTML = '<p style="color:#64748b;">Nincsenek tételek.</p>';
+        return;
+    }
+
+    let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Gyógyszer Neve</th>
+                    <th>Hatóanyag</th>
+                    <th style="text-align:center;">Reggel</th>
+                    <th style="text-align:center;">Délben</th>
+                    <th style="text-align:center;">Este</th>
+                    <th style="text-align:center;">Éjjel</th>
+                    <th style="text-align:center;">Gyári szám (LOT) / Lejárat</th>
+                    <th style="text-align:center;">Státusz</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    prescriptionItems.forEach((item, idx) => {
+        const pupha = item.pupha_master;
+        const displayBrandName = item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen');
+        const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
+        const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
+
+        const isScannedActive = (lastScannedIndex === idx) ? 'row-scanned-active' : '';
+        const isCompleted = scannedIndices.has(idx);
+        const rowClass = isCompleted ? 'row-scanned-completed' : 'row-in-stock';
+
+        const batchData = itemBatchMap[idx];
+        const batchStr = batchData 
+            ? `<span class="batch-info">LOT: ${batchData.lot_number} | EXP: ${batchData.expiry_date}</span>` 
+            : '<span style="color:#94a3b8; font-size:12px;">-</span>';
+
+        html += `
+            <tr class="${rowClass} ${isScannedActive}">
+                <td>
+                    <strong style="color:#1e293b; font-size:15px;">${displayBrandName}</strong>
+                    ${isCompleted ? '<span class="check-mark">✓</span>' : ''}
+                    ${originalBrandName ? `<div style="font-size:12px; color:#1565c0; margin-top:2px;">Helyettesítve erről: <i>${originalBrandName}</i></div>` : ''}
+                </td>
+                <td style="color:#475569; font-size:13px;">${ingredient}</td>
+                <td class="dose-cell">${item.dose_morning || 0}</td>
+                <td class="dose-cell">${item.dose_noon || 0}</td>
+                <td class="dose-cell">${item.dose_evening || 0}</td>
+                <td class="dose-cell">${item.dose_night || 0}</td>
+                <td style="text-align:center;">${batchStr}</td>
+                <td style="text-align:center;">
+                    ${isCompleted 
+                        ? '<span style="color:#2e7d32; font-weight:700; font-size:12px;">✓ Becsippantva</span>' 
+                        : '<span style="color:#64748b; font-weight:600; font-size:12px;">⏳ Várakozik</span>'}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+// VONALKÓD BEOLVASÁS
+async function processBarcodeScan(barcode) {
+    if (!barcode) return;
+    const cleanBarcode = barcode.trim();
+
+    const localMatch = localInventory.find(l => l.barcode === cleanBarcode);
+
+    if (localMatch) {
+        const matchedIdx = prescriptionItems.findIndex(item => 
+            (item.substituted_name && item.substituted_name === localMatch.brand_name) ||
+            (item.pupha_master && (item.pupha_master.ttt_code === localMatch.ttt_code || item.pupha_master.brand_name === localMatch.brand_name))
+        );
+
+        if (matchedIdx !== -1) {
+            currentScanningItemIndex = matchedIdx;
+            currentScanningDrug = localMatch;
+
+            // LOT & EXP Modal megnyitása
+            await openBatchModal(localMatch);
+        } else {
+            alert("A beolvasott gyógyszer nem szerepel ebben az igénylésben!");
+        }
+    } else {
+        alert("Ismeretlen vonalkód a helyi készletben!");
+    }
+
+    document.getElementById("scannerInput").value = '';
+}
+
+// BATCH MODAL KEZELÉS
+async function openBatchModal(drug) {
+    document.getElementById("batchModalTitle").innerText = `${drug.brand_name} – LOT & EXP Rögzítés`;
+    document.getElementById("inputLotNumber").value = '';
+    document.getElementById("inputExpiryDate").value = '';
+
+    const listContainer = document.getElementById("existingBatchesList");
+    listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Meglévő sarzsok keresése...</div>';
+
+    // Lekérés az inventory_batches táblából
+    try {
+        const { data: batches } = await window.supabaseClient
+            .from('inventory_batches')
+            .select('*')
+            .eq('drug_name', drug.brand_name)
+            .order('expiry_date', { ascending: true });
+
+        if (batches && batches.length > 0) {
+            let html = '';
+            batches.forEach(b => {
+                html += `
+                    <div class="batch-item" onclick="selectExistingBatch('${b.lot_number}', '${b.expiry_date}')">
+                        <div>
+                            <strong>LOT: ${b.lot_number}</strong>
+                            <div style="font-size:12px; color:#64748b;">Lejárat: ${b.expiry_date}</div>
+                        </div>
+                        <button style="font-size:11px; padding:3px 8px;">Kiválasztás</button>
+                    </div>
+                `;
+            });
+            listContainer.innerHTML = html;
+        } else {
+            listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Nincs korábbi rögzített sarzs ehhez a gyógyszerhez.</div>';
+        }
+    } catch (e) {
+        console.error("Hiba a sarzsok lekérésekor:", e);
+        listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#c62828;">Hiba a sarzsok lekérdezésekor.</div>';
+    }
+
+    document.getElementById("batchModal").style.display = "flex";
+}
+
+function selectExistingBatch(lot, exp) {
+    document.getElementById("inputLotNumber").value = lot;
+    document.getElementById("inputExpiryDate").value = exp;
+}
+
+function closeBatchModal() {
+    document.getElementById("batchModal").style.display = "none";
+}
+
+async function saveBatchAndConfirm() {
+    const lot = document.getElementById("inputLotNumber").value.trim();
+    const exp = document.getElementById("inputExpiryDate").value;
+
+    if (!lot || !exp) {
+        alert("Kérjük, adja meg a Gyári számot (LOT) és a Lejárati dátumot (EXP)!");
+        return;
+    }
+
+    // Elmentjük a Supabase inventory_batches táblába, ha még nem létezik
+    try {
+        await window.supabaseClient
+            .from('inventory_batches')
+            .upsert({
+                drug_name: currentScanningDrug.brand_name,
+                ttt_code: currentScanningDrug.ttt_code,
+                lot_number: lot,
+                expiry_date: exp
+            }, { onConflict: 'drug_name,lot_number' });
+    } catch (e) {
+        console.warn("Inventory_batches mentési figyelmeztetés:", e);
+    }
+
+    // Tétel frissítése az oldalon
+    itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
+    scannedIndices.add(currentScanningItemIndex);
+    lastScannedIndex = currentScanningItemIndex;
+
+    closeBatchModal();
+    renderMedicationTable();
+}
+
+// GYÓGYSZERELÉS LEZÁRÁSA (RUGALMAS ELLENŐRZÉSSEL)
+async function finishMedication() {
+    if (!currentPrescriptionId) return;
+
+    const totalItems = prescriptionItems.length;
+    const scannedCount = scannedIndices.size;
+
+    if (scannedCount < totalItems) {
+        const confirmFinish = confirm(`Figyelem: Csak ${scannedCount} db gyógyszer lett beolvasva a(z) ${totalItems} tételbőll!\n\nBiztosan le szeretné zárni a gyógyszerelést hianyos csippantással is?`);
+        if (!confirmFinish) return;
+    }
+
+    try {
+        const user = Auth.getCurrentUser();
+        await window.supabaseClient
+            .from('prescriptions')
+            .update({
+                status: 'dispensed',
+                dispensed_by: user ? user.id : null
+            })
+            .eq('id', currentPrescriptionId);
+
+        alert("Gyógyszerelés és tálcázás sikeresen lezárva!");
+        window.location.href = 'medication-list.html';
+    } catch (e) {
+        console.error("Hiba a lezárás során:", e);
+        alert("Hiba történt a lezárás során!");
+    }
+}
+
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateDateTime();
+setInterval(updateDateTime, 10000);
+</script>
+
+</body>
+</html>
