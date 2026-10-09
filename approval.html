@@ -427,7 +427,7 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
 
         if (patient) {
             document.getElementById("patientName").innerText = patient.name;
-            document.getElementById("patientTaj").innerText = `TAJ: ${patient.taj || '-'}`;
+            document.getElementById("patientTaj").innerText = patient.taj || '-';
             
             // Születési dátum és életkor formázása
             if (patient.birth_date) {
