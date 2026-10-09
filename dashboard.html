@@ -31,6 +31,7 @@ header h1 {
     margin: 0;
     font-size: 22px;
     font-weight: 600;
+    color: #1565c0;
 }
 
 .header-right {
@@ -74,26 +75,33 @@ header h1 {
     font-weight: 600;
 }
 
-.logout-btn:hover {
-    background: #ffcdd2;
-}
+.logout-btn:hover { background: #ffcdd2; }
 
 /* ===== CONTAINER ===== */
 .container {
     padding: 32px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.section-title-main {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 16px;
 }
 
 /* ===== STATUS CARDS ===== */
 .status-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 22px;
-    margin-bottom: 50px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
 }
 
 .status-card {
     background: white;
-    padding: 26px;
+    padding: 22px 26px;
     border-radius: 14px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
     cursor: pointer;
@@ -104,13 +112,13 @@ header h1 {
 }
 
 .status-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-.status-title { font-size: 16px; font-weight: 500; }
-.status-number { font-size: 40px; font-weight: 700; text-align: right; }
-.status-sub { font-size: 12px; color: #888; }
+.status-title { font-size: 15px; font-weight: 600; color: #475569; }
+.status-number { font-size: 38px; font-weight: 700; text-align: right; color: #0f172a; }
+.status-sub { font-size: 12px; color: #64748b; text-align: right; }
 
 .orange { border-left: 6px solid #ff9800; }
 .blue { border-left: 6px solid #2196f3; }
@@ -120,9 +128,9 @@ header h1 {
 /* ===== WARD GRID ===== */
 .ward-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 22px;
-    margin-top: 20px;
+    margin-bottom: 40px;
 }
 
 .ward-card {
@@ -134,41 +142,98 @@ header h1 {
     transition: 0.2s;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    border: 1px solid #e2e8f0;
 }
 
-.ward-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-.ward-card h3 { margin-top: 0; font-size: 18px; font-weight: 600; }
-.ward-status { font-size: 14px; line-height: 1.6; color: #555; }
+.ward-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    border-color: #cbd5e1;
+}
+
+.ward-left h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ward-total {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1565c0;
+    margin-bottom: 8px;
+}
+
+.ward-status-list {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.6;
+}
+
+.ward-badge-count {
+    background: #e2e8f0;
+    color: #334155;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 12px;
+}
 
 .ward-indicator {
-    width: 70px; height: 70px; border-radius: 16px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 36px; font-weight: bold;
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
 }
 
-.success { background: #e8f5e9; color: #4caf50; }
-.warning { background: #fff3e0; color: #ff9800; }
-.processing { background: #e3f2fd; color: #2196f3; }
+.success { background: #e8f5e9; color: #2e7d32; }
+.warning { background: #fff3e0; color: #e65100; }
+.processing { background: #e3f2fd; color: #1565c0; }
+
+.no-data-msg {
+    background: white;
+    padding: 24px;
+    border-radius: 14px;
+    text-align: center;
+    color: #64748b;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
 
 /* ===== BOTTOM ACTIONS ===== */
 .bottom-actions {
-    margin-top: 60px;
+    margin-top: 40px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 20px;
 }
 
 .icon-button {
-    background: white; border-radius: 16px;
+    background: white;
+    border-radius: 14px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-    cursor: pointer; transition: 0.2s; height: 120px;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    cursor: pointer;
+    transition: 0.2s;
+    height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid #f1f5f9;
 }
 
-.icon-button:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-.icon { font-size: 34px; }
-.icon-text { margin-top: 8px; font-weight: 500; font-size: 14px; }
+.icon-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.icon { font-size: 32px; }
+.icon-text { margin-top: 8px; font-weight: 600; font-size: 13px; color: #334155; }
 </style>
 </head>
 
@@ -203,93 +268,203 @@ header h1 {
 
 <div class="container">
 
-<!-- ===== STÁTUSZOK ===== -->
+<!-- ===== ÉLŐ STÁTUSZOK ===== -->
+<div class="section-title-main">📊 Aktuális Gyógyszerelési Fázisok</div>
 <div class="status-grid">
     <div class="status-card orange" onclick="location.href='approval-list.html'">
         <div class="status-title">Jóváhagyásra vár</div>
-        <div><div class="status-number">18</div><div class="status-sub">beteg</div></div>
+        <div><div id="cntSubmitted" class="status-number">0</div><div class="status-sub">igénylés</div></div>
     </div>
 
     <div class="status-card blue" onclick="location.href='medication-list.html'">
         <div class="status-title">Gyógyszerelésre vár</div>
-        <div><div class="status-number">12</div><div class="status-sub">beteg</div></div>
+        <div><div id="cntReviewed" class="status-number">0</div><div class="status-sub">igénylés</div></div>
     </div>
 
     <div class="status-card green" onclick="location.href='verification-list.html'">
         <div class="status-title">Ellenőrzésre vár</div>
-        <div><div class="status-number">6</div><div class="status-sub">beteg</div></div>
+        <div><div id="cntDispensed" class="status-number">0</div><div class="status-sub">igénylés</div></div>
     </div>
 
     <div class="status-card gray" onclick="location.href='completed-list.html'">
         <div class="status-title">Készen van</div>
-        <div><div class="status-number">44</div><div class="status-sub">beteg</div></div>
+        <div><div id="cntCompleted" class="status-number">0</div><div class="status-sub">igénylés</div></div>
     </div>
 </div>
 
-<!-- ===== OSZTÁLYOK ===== -->
-<div class="ward-grid">
-    <div class="ward-card" onclick="location.href='ward.html'">
-        <div class="ward-left">
-            <h3>Belgyógyászat</h3>
-            <div class="ward-status">Betegek: 38 | Kész: 38</div>
-        </div>
-        <div class="ward-indicator success">✓</div>
-    </div>
-
-    <div class="ward-card" onclick="location.href='ward.html'">
-        <div class="ward-left">
-            <h3>Sebészet</h3>
-            <div class="ward-status">Betegek: 24 | Függő: 2</div>
-        </div>
-        <div class="ward-indicator warning">⏳</div>
-    </div>
+<!-- ===== OSZTÁLYOK DÍNÁMIKUS LISTÁJA ===== -->
+<div class="section-title-main">🏥 Aktív Igényléssel Rendelkező Osztályok</div>
+<div id="wardGridContainer" class="ward-grid">
+    <div class="no-data-msg">Adatok betöltése...</div>
 </div>
 
-<!-- ===== BOTTOM MODULES ===== -->
+<!-- ===== KISZEGGÉS ÉS GYORSIKONOK ===== -->
 <div class="bottom-actions">
-    <div class="icon-button" onclick="location.href='cikktorzs.html'">
-        <div class="icon">💊</div>
-        <div class="icon-text">Gyógyszerek</div>
+    <div class="icon-button" onclick="location.href='doctor-dashboard.html'">
+        <div class="icon">🏥</div>
+        <div class="icon-text">Osztályos Nézet</div>
     </div>
-    <div class="icon-button">
-        <div class="icon">📊</div>
-        <div class="icon-text">Kimutatás</div>
+    <div class="icon-button" onclick="location.href='approval-list.html'">
+        <div class="icon">💊</div>
+        <div class="icon-text">Patikai Jóváhagyás</div>
     </div>
     <div class="icon-button" onclick="location.href='patients.html'">
         <div class="icon">👤</div>
         <div class="icon-text">Betegek</div>
     </div>
     <div class="icon-button">
-        <div class="icon">⚙</div>
-        <div class="icon-text">Beállítások</div>
+        <div class="icon">📊</div>
+        <div class="icon-text">Kimutatás</div>
     </div>
 </div>
 
 </div>
 
 <script>
-// Munkamenet betöltése és fejléc frissítése
 document.addEventListener("DOMContentLoaded", () => {
     const user = Auth.requireAuth();
     if (user) {
         document.getElementById("userName").innerText = user.name;
         
-        // Szerepkör választó beállítása
         const roleSel = document.getElementById("roleSelector");
-        if (roleSel) {
-            roleSel.value = user.activeRole || 'pharmacist';
-        }
+        if (roleSel) roleSel.value = user.activeRole || 'pharmacist';
 
-        // Osztály választó beállítása
         const deptSel = document.getElementById("deptSelector");
-        if (deptSel) {
-            deptSel.value = user.activeDepartment || 'Belgyógyászat';
-        }
+        if (deptSel) deptSel.value = user.activeDepartment || 'Belgyógyászat';
+
+        // Élő dashboard adatok betöltése Supabase-ből
+        loadDashboardData();
     }
 });
 
+async function loadDashboardData() {
+    try {
+        // 1. Az összes igénylés és a hozzájuk tartozó betegek lekérése
+        const { data: prescriptions, error: pErr } = await window.supabaseClient
+            .from('prescriptions')
+            .select('id, status, patient_id');
+
+        if (pErr) throw pErr;
+
+        // Státusz számlálók inicializálása
+        let cntSubmitted = 0;
+        let cntReviewed = 0;
+        let cntDispensed = 0;
+        let cntCompleted = 0;
+
+        const patientIds = [...new Set((prescriptions || []).map(p => p.patient_id).filter(Boolean))];
+
+        if (prescriptions) {
+            prescriptions.forEach(p => {
+                if (p.status === 'submitted') cntSubmitted++;
+                else if (p.status === 'reviewed') cntReviewed++;
+                else if (p.status === 'dispensed') cntDispensed++;
+                else if (p.status === 'completed') cntCompleted++;
+            });
+        }
+
+        // Felső kártyák frissítése
+        document.getElementById("cntSubmitted").innerText = cntSubmitted;
+        document.getElementById("cntReviewed").innerText = cntReviewed;
+        document.getElementById("cntDispensed").innerText = cntDispensed;
+        document.getElementById("cntCompleted").innerText = cntCompleted;
+
+        // 2. Osztályok szerinti csoportosítás
+        if (patientIds.length === 0) {
+            document.getElementById("wardGridContainer").innerHTML = '<div class="no-data-msg">Jelenleg nincs aktív gyógyszerigénylés egyetlen osztályon sem.</div>';
+            return;
+        }
+
+        const { data: patients, error: patErr } = await window.supabaseClient
+            .from('patients')
+            .select('id, department')
+            .in('id', patientIds);
+
+        if (patErr) throw patErr;
+
+        const patientDeptMap = {};
+        if (patients) {
+            patients.forEach(pat => {
+                patientDeptMap[pat.id] = pat.department || 'Egyéb Osztály';
+            });
+        }
+
+        // Osztályonkénti igénylések és státuszok számlálása
+        const wardStats = {};
+
+        prescriptions.forEach(p => {
+            const dept = patientDeptMap[p.patient_id];
+            if (dept) {
+                if (!wardStats[dept]) {
+                    wardStats[dept] = {
+                        total: 0,
+                        submitted: 0,
+                        reviewed: 0,
+                        dispensed: 0,
+                        completed: 0
+                    };
+                }
+                wardStats[dept].total++;
+                if (p.status === 'submitted') wardStats[dept].submitted++;
+                else if (p.status === 'reviewed') wardStats[dept].reviewed++;
+                else if (p.status === 'dispensed') wardStats[dept].dispensed++;
+                else if (p.status === 'completed') wardStats[dept].completed++;
+            }
+        });
+
+        // 3. Osztályos buborékok generálása
+        const wardContainer = document.getElementById("wardGridContainer");
+        let html = '';
+
+        for (const [dept, stats] of Object.entries(wardStats)) {
+            let indicatorClass = 'processing';
+            let indicatorIcon = '⏳';
+
+            if (stats.submitted > 0) {
+                indicatorClass = 'warning';
+                indicatorIcon = '📋';
+            } else if (stats.reviewed > 0) {
+                indicatorClass = 'processing';
+                indicatorIcon = '💊';
+            } else if (stats.total === stats.completed) {
+                indicatorClass = 'success';
+                indicatorIcon = '✓';
+            }
+
+            // Státusz részletezés összeállítása
+            let statusDetails = [];
+            if (stats.submitted > 0) statusDetails.push(`<strong>${stats.submitted}</strong> Jóváhagyásra vár`);
+            if (stats.reviewed > 0) statusDetails.push(`<strong>${stats.reviewed}</strong> Gyógyszerelésre vár`);
+            if (stats.dispensed > 0) statusDetails.push(`<strong>${stats.dispensed}</strong> Ellenőrzésre vár`);
+            if (stats.completed > 0) statusDetails.push(`<strong>${stats.completed}</strong> Kész`);
+
+            html += `
+                <div class="ward-card" onclick="location.href='ward.html?department=${encodeURIComponent(dept)}'">
+                    <div class="ward-left">
+                        <h3>${dept}</h3>
+                        <div class="ward-total">Összes igény: ${stats.total} db</div>
+                        <div class="ward-status-list">
+                            ${statusDetails.join('<br>')}
+                        </div>
+                    </div>
+                    <div class="ward-indicator ${indicatorClass}">${indicatorIcon}</div>
+                </div>
+            `;
+        }
+
+        wardContainer.innerHTML = html;
+
+    } catch (err) {
+        console.error("Hiba a dashboard adatok betöltésekor:", err);
+        document.getElementById("wardGridContainer").innerHTML = '<div class="no-data-msg">Hiba történt az osztályos adatok betöltése során.</div>';
+    }
+}
+
 function changeRole(newRole) {
     Auth.updateContext(newRole, null);
+    if (newRole === 'doctor' || newRole === 'nurse') {
+        window.location.href = 'doctor-dashboard.html';
+    }
 }
 
 function changeDepartment(newDept) {
