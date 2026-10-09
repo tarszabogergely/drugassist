@@ -648,10 +648,12 @@ function filterLocalList(searchTerm) {
 
 function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
     const item = prescriptionItems[selectedItemIndex];
-    item.local_drug_id = localDrugId; // local_drug_id elmentése
-    item.substituted_name = newBrandName;
-    item.substituted_ingredient = newIngredient;
-    alert(`Helyettesítve erre: ${newBrandName}`);
+    if (item) {
+        item.local_drug_id = localDrugId;
+        item.substituted_name = newBrandName;
+        item.substituted_ingredient = newIngredient;
+        alert(`Helyettesítve erre: ${newBrandName}`);
+    }
 }
 
 function saveSubstitution() {
@@ -672,35 +674,50 @@ async function approvePrescription() {
         return;
     }
 
-    if (!currentPrescriptionId) return;
+    if (!currentPrescriptionId) {
+        alert("Hiányzó igénylés azonosító!");
+        return;
+    }
 
     const noteText = document.getElementById("patientNote").value.trim();
 
     try {
         const user = Auth.getCurrentUser();
 
-        // 1. Módosított/Helyettesített tételek mentése a prescription_items táblába
-        for (const item of prescriptionItems) {
-            const { error: itemErr } = await window.supabaseClient
-                .from('prescription_items')
-                .update({
-                    local_drug_id: item.local_drug_id || null,
-                    substituted_name: item.substituted_name || null,
-                    substituted_ingredient: item.substituted_ingredient || null,
-                    dose_morning: item.dose_morning || 0,
-                    dose_noon: item.dose_noon || 0,
-                    dose_evening: item.dose_evening || 0,
-                    dose_night: item.dose_night || 0
-                })
-                .eq('id', item.id);
+        // 1. Módosított/Helyettesített tételek mentése párhuzamosan (Promise.all)
+        const updatePromises = prescriptionItems.map(item => {
+            const updatePayload = {
+                substituted_name: item.substituted_name || null,
+                substituted_ingredient: item.substituted_ingredient || null,
+                dose_morning: parseFloat(item.dose_morning) || 0,
+                dose_noon: parseFloat(item.dose_noon) || 0,
+                dose_evening: parseFloat(item.dose_evening) || 0,
+                dose_night: parseFloat(item.dose_night) || 0
+            };
 
-            if (itemErr) {
-                console.error("Hiba a tétel mentésekor:", itemErr);
+            // Csak akkor küldjük a local_drug_id-t, ha valóban ki lett választva helyettesítő
+            if (item.local_drug_id) {
+                updatePayload.local_drug_id = item.local_drug_id;
             }
+
+            return window.supabaseClient
+                .from('prescription_items')
+                .update(updatePayload)
+                .eq('id', item.id);
+        });
+
+        const results = await Promise.all(updatePromises);
+
+        // Ellenőrizzük, hogy volt-e hiba a tételek mentésekor
+        const itemErrors = results.filter(r => r.error);
+        if (itemErrors.length > 0) {
+            console.error("Hiba a tételek mentésekor:", itemErrors);
+            alert("Hiba történt a tételek mentése során! Ellenőrizze a konzolt.");
+            return;
         }
 
         // 2. Igénylés lezárása / státusz frissítése
-        const { error } = await window.supabaseClient
+        const { error: prescErr } = await window.supabaseClient
             .from('prescriptions')
             .update({
                 status: 'reviewed',
@@ -709,13 +726,14 @@ async function approvePrescription() {
             })
             .eq('id', currentPrescriptionId);
 
-        if (error) throw error;
+        if (prescErr) throw prescErr;
 
         alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva és elmentve!");
         window.location.href = 'approval-list.html';
+
     } catch (e) {
         console.error("Hiba a mentés során:", e);
-        alert("Hiba történt a mentés során!");
+        alert(`Hiba történt a mentés során: ${e.message || e}`);
     }
 }
 
