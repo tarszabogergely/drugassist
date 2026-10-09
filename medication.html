@@ -538,19 +538,23 @@ async function openBatchModal(drug) {
     const listContainer = document.getElementById("existingBatchesList");
     listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Meglévő sarzsok keresése...</div>';
 
-    // Lekérés az inventory_batches táblából
     try {
-        const { data: batches } = await window.supabaseClient
+        // Lekérés az inventory_batches táblából az adott gyógyszer nevére
+        const { data: batches, error } = await window.supabaseClient
             .from('inventory_batches')
             .select('*')
-            .eq('drug_name', drug.brand_name)
+            .ilike('drug_name', drug.brand_name.trim()) // ilike = kis/nagybetű független keresés
             .order('expiry_date', { ascending: true });
+
+        if (error) {
+            console.error("inventory_batches lekérdezési hiba:", error);
+        }
 
         if (batches && batches.length > 0) {
             let html = '';
             batches.forEach(b => {
                 html += `
-                    <div class="batch-item" onclick="selectExistingBatch('${b.lot_number}', '${b.expiry_date}')">
+                    <div class="batch-item" onclick="selectExistingBatch('${b.lot_number.replace(/'/g, "\\'")}', '${b.expiry_date}')">
                         <div>
                             <strong>LOT: ${b.lot_number}</strong>
                             <div style="font-size:12px; color:#64748b;">Lejárat: ${b.expiry_date}</div>
