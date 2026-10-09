@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html lang="hu">
+
 <head>
 <meta charset="UTF-8">
-<title>DrugAssist – Ellenőrzésre vár</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrugAssist - Gyógyszerészi ellenőrzés</title>
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
-    background-color: #f4f6f9;
+    background: #f4f6f9;
 }
 
 header {
@@ -25,56 +31,306 @@ header {
     align-items: center;
 }
 
-h1 { margin: 0; font-size: 20px; }
-
-.container { padding: 30px; }
-
-.section { margin-bottom: 40px; }
-
-.section-title {
-    font-size: 18px;
+header h1 {
+    margin: 0;
+    font-size: 24px;
     font-weight: 600;
-    margin-bottom: 15px;
+    color: #1565c0;
 }
 
-table {
+.user-info {
+    font-size: 14px;
+    color: #546e7a;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 32px;
+}
+
+.back {
+    margin-bottom: 20px;
+}
+
+.back a {
+    color: #1565c0;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.back a:hover {
+    text-decoration: underline;
+}
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.05);
+}
+
+.patient-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1565c0;
+    margin-bottom: 24px;
+}
+
+.patient-data {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    row-gap: 12px;
+    column-gap: 16px;
+    align-items: center;
+}
+
+.label {
+    font-weight: 600;
+    color: #546e7a;
+}
+
+#reviewTitle {
+    margin-top: 0;
+    margin-bottom: 24px;
+    color: #1565c0;
+    font-size: 22px;
+}
+
+.review-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
 }
 
-th, td {
-    padding: 14px;
+.review-table th {
+    background: #f7f8fa;
+    border-bottom: 2px solid #e0e0e0;
+    padding: 12px;
     font-size: 14px;
+    color: #475569;
+    text-align: center;
 }
 
-th {
-    background-color: #f0f2f5;
+.review-table th:first-child {
     text-align: left;
 }
 
-tr:not(:last-child) { border-bottom: 1px solid #eee; }
-tr:hover { background-color: #fafafa; }
-
-.action-btn {
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: none;
-    background-color: #2196f3;
-    color: white;
-    cursor: pointer;
-    font-size: 13px;
+.review-table td {
+    border-bottom: 1px solid #eeeeee;
+    padding: 14px 12px;
 }
 
-.badge {
-    background-color: #4caf50;
-    color: white;
+.drug-cell {
+    width: 340px;
+}
+
+.drug-name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #1e293b;
+}
+
+.drug-substitude {
     font-size: 12px;
-    padding: 3px 8px;
-    border-radius: 12px;
+    color: #1565c0;
+    font-style: italic;
+    margin-bottom: 4px;
+}
+
+.drug-morphology {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.batch-tag {
+    display: inline-block;
+    background: #e2e8f0;
+    color: #1e293b;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.dose {
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    vertical-align: middle;
+    color: #0f172a;
+}
+
+.check-cell {
+    width: 70px;
+    text-align: center;
+}
+
+.check-button {
+    width: 36px;
+    height: 36px;
+    margin: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+    border: 2px solid #9e9e9e;
+    background: #eeeeee;
+    color: #616161;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s, background .25s, color .25s, border-color .25s;
+}
+
+.check-button:hover {
+    transform: scale(1.08);
+}
+
+.check-button:active {
+    transform: scale(.92);
+}
+
+.check-button.checked {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: white;
+}
+
+.reviewed td {
+    background: #f0fdf4;
+}
+
+.reviewed .drug-name,
+.reviewed .drug-morphology,
+.reviewed .dose {
+    opacity: .7;
+}
+
+.complete {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.complete button {
+    min-width: 320px;
+    background: #2e7d32;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 34px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+}
+
+.complete button:hover:not(:disabled) {
+    background: #256428;
+}
+
+.complete button:active:not(:disabled) {
+    transform: scale(.98);
+}
+
+.complete button:disabled {
+    background: #bdbdbd;
+    color: #eeeeee;
+    cursor: not-allowed;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.hidden {
+    display: none;
+}
+
+.modal-card {
+    background: white;
+    width: 420px;
+    max-width: 92%;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+
+.modal-card h2 {
+    margin-top: 0;
+    color: #1e293b;
+}
+
+.modal-card input {
+    width: 100%;
+    padding: 12px;
+    font-size: 18px;
+    margin-top: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.barcode-error {
+    color: #d32f2f;
+    font-weight: bold;
+    margin-top: 14px;
+    min-height: 24px;
+    font-size: 14px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.modal-buttons button {
+    min-width: 120px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .2s;
+}
+
+#cancelBarcode {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+#cancelBarcode:hover {
+    background: #d1d5db;
+}
+
+#confirmBarcode {
+    background: #2e7d32;
+    color: white;
+}
+
+#confirmBarcode:hover {
+    background: #256428;
+}
+
+@media (max-width:900px) {
+    .patient-data { grid-template-columns: 1fr; }
+    .container { padding: 12px; }
 }
 </style>
 </head>
@@ -82,48 +338,300 @@ tr:hover { background-color: #fafafa; }
 <body>
 
 <header>
-    <h1>DrugAssist – Ellenőrzésre vár</h1>
-    <div id="dateTime"></div>
+    <h1>DrugAssist – Gyógyszerészi ellenőrzés</h1>
+    <div class="user-info" id="userInfo">Gyógyszerész</div>
 </header>
 
 <div class="container">
 
-    <div class="section">
-        <div class="section-title">
-            Belgyógyászat <span class="badge">3 beteg</span>
-        </div>
+<div class="back">
+    <a href="verification-list.html">← Vissza az ellenőrzésre váró listához</a>
+</div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Beteg neve</th>
-                    <th>Ágy</th>
-                    <th>Kiadagolva</th>
-                    <th>Tételek</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Kovács János</td>
-                    <td>12/B</td>
-                    <td>10:05</td>
-                    <td>8</td>
-                    <td><button class="action-btn" onclick="location.href='review.html'">Vizuális Ellenőrzés</button></td>
-                </tr>
-            </tbody>
-        </table>
+<!-- BETEG ADATOK -->
+<section class="card">
+    <div class="patient-name" id="patientName">Beteg betöltése...</div>
+    <div class="patient-data">
+        <div class="label">TAJ / Azonosító</div>
+        <div id="patientTaj">-</div>
+        <div class="label">Osztály</div>
+        <div id="patientWard">-</div>
+        <div class="label">Ágy</div>
+        <div id="patientBed">-</div>
+        <div class="label">Készítési azonosító</div>
+        <div id="productionId" style="font-weight:bold; color:#1565c0;">-</div>
+        <div class="label">Tálcázta / Készítette</div>
+        <div id="preparedBy">-</div>
     </div>
+</section>
+
+<!-- GYÓGYSZERLISTA TÁBLÁZAT -->
+<section class="card">
+    <h2 id="reviewTitle">💊 Gyógyszerészi ellenőrzés</h2>
+    <table class="review-table" id="reviewTable">
+        <thead id="reviewHead">
+            <tr>
+                <th style="text-align:left;">Gyógyszer</th>
+                <th>Éjjel</th>
+                <th>Hajnal</th>
+                <th>Reggel</th>
+                <th>Dél</th>
+                <th>Délután</th>
+                <th>Este</th>
+                <th class="check-cell">✔</th>
+            </tr>
+        </thead>
+        <tbody id="medicationTable">
+            <tr><td colspan="8" style="text-align:center; color:#64748b; padding:20px;">Tételek betöltése...</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- LEZÁRÁS GOMB -->
+<div class="complete">
+    <button type="button" id="reviewButton" class="primary-button" disabled onclick="openBarcodeModal()">
+        ✔ Ellenőrzés lezárása
+    </button>
+</div>
 
 </div>
 
+<!-- KÉSZÍTÉSI AZONOSÍTÓ MODAL -->
+<div id="barcodeModal" class="modal hidden">
+    <div class="modal-card">
+        <h2>📦 Készítési azonosító</h2>
+        <p>Csippantsa be vagy adja meg a készítmény vonalkódját a lezárás megerősítéséhez.</p>
+        <input id="barcodeInput" type="text" autocomplete="off" spellcheck="false" placeholder="Vonalkód...">
+        <div id="barcodeError" class="barcode-error"></div>
+        <div class="modal-buttons">
+            <button id="cancelBarcode" onclick="closeBarcodeModal()">✖ Mégse</button>
+            <button id="confirmBarcode" onclick="confirmReviewWithBarcode()">✔ Jóváhagyás</button>
+        </div>
+    </div>
+</div>
+
 <script>
-function updateDateTime() {
-    const now = new Date();
-    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+let currentPrescriptionId = null;
+let currentPatientId = null;
+let expectedBarcode = "";
+let itemsCheckState = {}; // Tétel ID -> boolean (ellenőrizve)
+let prescriptionItems = [];
+
+document.addEventListener("DOMContentLoaded", async () => {
+    Auth.requireAuth();
+    
+    // Felhasználói név megjelenítése
+    const user = Auth.getCurrentUser();
+    if (user && user.email) {
+        document.getElementById("userInfo").innerText = user.email;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    currentPatientId = urlParams.get('patientId');
+    currentPrescriptionId = urlParams.get('prescriptionId');
+
+    if (currentPatientId && currentPrescriptionId) {
+        await loadReviewData(currentPatientId, currentPrescriptionId);
+    } else {
+        alert("Hiányzó beteg vagy igénylés azonosító!");
+    }
+
+    // Vonalkód enter megnyomásra
+    document.getElementById("barcodeInput").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            confirmReviewWithBarcode();
+        }
+    });
+});
+
+async function loadReviewData(patientId, prescriptionId) {
+    try {
+        // 1. Beteg adatok lekérése
+        const { data: patient } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .eq('id', patientId)
+            .single();
+
+        if (patient) {
+            document.getElementById("patientName").innerText = patient.name;
+            document.getElementById("patientTaj").innerText = patient.taj || '-';
+            document.getElementById("patientWard").innerText = patient.department || '-';
+            document.getElementById("patientBed").innerText = patient.room_bed || '-';
+        }
+
+        // 2. Igénylés és tételek lekérése törzsadatokkal együtt
+        const { data: prescription, error } = await window.supabaseClient
+            .from('prescriptions')
+            .select(`
+                *,
+                prescription_items(*, pupha_master(*), local_inventory_master(*))
+            `)
+            .eq('id', prescriptionId)
+            .single();
+
+        if (error || !prescription) {
+            console.error("Igénylés betöltési hiba:", error);
+            alert("Nem sikerült betölteni a kiválasztott igénylést!");
+            return;
+        }
+
+        expectedBarcode = prescription.barcode || '';
+        document.getElementById("productionId").innerText = expectedBarcode || 'Nincs generálva';
+
+        // Tálcázó személy nevének lekérése profilból (ha megvan)
+        if (prescription.dispensed_by) {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', prescription.dispensed_by)
+                .maybeSingle();
+            
+            if (profile) {
+                document.getElementById("preparedBy").innerText = profile.full_name || profile.email;
+            } else {
+                document.getElementById("preparedBy").innerText = "Asszisztens";
+            }
+        } else {
+            document.getElementById("preparedBy").innerText = "Asszisztens";
+        }
+
+        prescriptionItems = prescription.prescription_items || [];
+        renderReviewTable(prescriptionItems);
+
+    } catch (e) {
+        console.error("Váratlan hiba:", e);
+    }
 }
-updateDateTime();
-setInterval(updateDateTime, 10000);
+
+function renderReviewTable(items) {
+    const tbody = document.getElementById("medicationTable");
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#64748b;">Nincsenek tételek ebben az igénylésben.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    items.forEach((item) => {
+        const pupha = item.pupha_master;
+        const local = item.local_inventory_master;
+
+        const displayBrandName = item.substituted_name || (local ? local.brand_name : (pupha ? pupha.brand_name : 'Ismeretlen gyógyszer'));
+        const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
+        const ingredient = item.substituted_ingredient || (local ? local.active_ingredient : (pupha ? pupha.active_ingredient : ''));
+        const morphology = (local ? local.morphology : null) || (pupha ? pupha.morphology : null) || '';
+
+        const lotStr = item.batch_number ? `LOT: ${item.batch_number}` : '';
+        const expStr = item.expiration_date ? `EXP: ${item.expiration_date}` : '';
+        const batchInfo = (lotStr || expStr) ? `${lotStr} ${expStr}`.trim() : '';
+
+        const isChecked = itemsCheckState[item.id] || false;
+        const rowClass = isChecked ? 'reviewed' : '';
+        const checkClass = isChecked ? 'check-button checked' : 'check-button';
+
+        html += `
+            <tr id="row-${item.id}" class="${rowClass}">
+                <td class="drug-cell">
+                    <div class="drug-name">${displayBrandName}</div>
+                    ${originalBrandName ? `<div class="drug-substitude">Helyettesítve erről: ${originalBrandName}</div>` : ''}
+                    <div style="font-size:13px; color:#475569;">${ingredient}</div>
+                    ${morphology ? `<div class="drug-morphology">🔍 Morfológia: ${morphology}</div>` : ''}
+                    ${batchInfo ? `<div class="batch-tag">${batchInfo}</div>` : ''}
+                </td>
+                <td class="dose">${item.dose_night || 0}</td>
+                <td class="dose">${item.dose_dawn || 0}</td>
+                <td class="dose">${item.dose_morning || 0}</td>
+                <td class="dose">${item.dose_noon || 0}</td>
+                <td class="dose">${item.dose_afternoon || 0}</td>
+                <td class="dose">${item.dose_evening || 0}</td>
+                <td class="check-cell">
+                    <div class="${checkClass}" onclick="toggleCheck('${item.id}')">
+                        ${isChecked ? '✓' : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    updateCompleteButtonState();
+}
+
+function toggleCheck(itemId) {
+    itemsCheckState[itemId] = !itemsCheckState[itemId];
+    
+    const row = document.getElementById(`row-${itemId}`);
+    if (row) {
+        renderReviewTable(prescriptionItems);
+    }
+}
+
+function updateCompleteButtonState() {
+    const totalItems = prescriptionItems.length;
+    const checkedCount = Object.values(itemsCheckState).filter(Boolean).length;
+    
+    const completeBtn = document.getElementById("reviewButton");
+    if (totalItems > 0 && checkedCount === totalItems) {
+        completeBtn.disabled = false;
+    } else {
+        completeBtn.disabled = true;
+    }
+}
+
+function openBarcodeModal() {
+    document.getElementById("barcodeInput").value = '';
+    document.getElementById("barcodeError").innerText = '';
+    document.getElementById("barcodeModal").classList.remove("hidden");
+    setTimeout(() => {
+        document.getElementById("barcodeInput").focus();
+    }, 100);
+}
+
+function closeBarcodeModal() {
+    document.getElementById("barcodeModal").classList.add("hidden");
+}
+
+async function confirmReviewWithBarcode() {
+    const inputBarcode = document.getElementById("barcodeInput").value.trim();
+    const errorDiv = document.getElementById("barcodeError");
+
+    if (!inputBarcode) {
+        errorDiv.innerText = "Kérjük, adja meg a vonalkódot!";
+        return;
+    }
+
+    if (expectedBarcode && inputBarcode !== expectedBarcode) {
+        errorDiv.innerText = "Hibás készítési azonosító! Ellenőrizze a csomagolást.";
+        return;
+    }
+
+    try {
+        const user = Auth.getCurrentUser();
+        
+        // Státusz frissítése 'completed'-re a Supabase-ben
+        const { error } = await window.supabaseClient
+            .from('prescriptions')
+            .update({
+                status: 'completed',
+                reviewed_by: user ? user.id : null
+            })
+            .eq('id', currentPrescriptionId);
+
+        if (error) {
+            console.error("Lezárási hiba:", error);
+            errorDiv.innerText = "Hiba történt a lezárás során: " + error.message;
+            return;
+        }
+
+        alert("A gyógyszerelés gyógyszerészi ellenőrzése sikeresen lezárva!");
+        closeBarcodeModal();
+        window.location.href = 'verification-list.html';
+
+    } catch (e) {
+        console.error("Váratlan hiba:", e);
+        errorDiv.innerText = "Váratlan hiba lépett fel.";
+    }
+}
 </script>
 
 </body>
