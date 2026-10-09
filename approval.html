@@ -654,20 +654,28 @@ async function approvePrescription() {
 
     if (!currentPrescriptionId) return;
 
+    // Megjegyzés kiolvasása a beviteli mezőből
+    const noteText = document.getElementById("patientNote").value.trim();
+
     try {
         const user = Auth.getCurrentUser();
-        await window.supabaseClient
+
+        const { error } = await window.supabaseClient
             .from('prescriptions')
             .update({
                 status: 'reviewed',
-                reviewed_by: user ? user.id : null
+                reviewed_by: user ? user.id : null,
+                pharmacy_notes: noteText // <-- Elmenti a megjegyzést
             })
             .eq('id', currentPrescriptionId);
+
+        if (error) throw error;
 
         alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva!");
         window.location.href = 'approval-list.html';
     } catch (e) {
         console.error("Hiba a mentés során:", e);
+        alert("Hiba történt a mentés során!");
     }
 }
 
