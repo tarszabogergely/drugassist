@@ -288,7 +288,7 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
     </div>
 </section>
 
-<!-- MEGJEGYZÉS DOBOZ (CSAK OLVASHATÓ / PATIKAI UTA SÍTÁS) -->
+<!-- MEGJEGYZÉS DOBOZ -->
 <div class="card note-container">
     <h3 style="margin:0 0 4px 0; font-size:16px; color:#334155;">📝 Patikai megjegyzés / utasítás</h3>
     <textarea id="patientNote" class="note-input" rows="2" readonly placeholder="Nincs patikai megjegyzés."></textarea>
@@ -415,6 +415,18 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientNote").value = prescription.pharmacy_notes || '';
 
             prescriptionItems = prescription.prescription_items || [];
+
+            // Korábban már rögzített sarzsok beolvasása a tételsorokból
+            prescriptionItems.forEach((item, idx) => {
+                if (item.batch_number && item.expiration_date) {
+                    itemBatchMap[idx] = {
+                        lot_number: item.batch_number,
+                        expiry_date: item.expiration_date
+                    };
+                    scannedIndices.add(idx);
+                }
+            });
+
             renderMedicationTable();
         }
     } catch (err) {
@@ -577,21 +589,44 @@ async function saveBatchAndConfirm() {
         return;
     }
 
-    // Elmentjük a Supabase inventory_batches táblába, ha még nem létezik
+    const currentItem = prescriptionItems[currentScanningItemIndex];
+
     try {
-        await window.supabaseClient
+        // 1. Mentés az inventory_batches táblába (hogy legközelebb felajánlja)
+        const { error: batchErr } = await window.supabaseClient
             .from('inventory_batches')
             .upsert({
                 drug_name: currentScanningDrug.brand_name,
-                ttt_code: currentScanningDrug.ttt_code,
+                ttt_code: currentScanningDrug.ttt_code || null,
                 lot_number: lot,
                 expiry_date: exp
             }, { onConflict: 'drug_name,lot_number' });
+
+        if (batchErr) {
+            console.error("inventory_batches hiba:", batchErr);
+        }
+
+        // 2. Mentés a prescription_items táblába (a konkrét igénylési tételhez)
+        if (currentItem && currentItem.id) {
+            const { error: itemErr } = await window.supabaseClient
+                .from('prescription_items')
+                .update({
+                    batch_number: lot,
+                    expiration_date: exp
+                })
+                .eq('id', currentItem.id);
+
+            if (itemErr) {
+                console.error("prescription_items sarzs mentési hiba:", itemErr);
+                alert(`Figyelem: A sarzs elmentése a tételsorhoz nem sikerült: ${itemErr.message}`);
+            }
+        }
+
     } catch (e) {
-        console.warn("Inventory_batches mentési figyelmeztetés:", e);
+        console.error("Hiba a sarzs mentése során:", e);
     }
 
-    // Tétel frissítése az oldalon
+    // Tétel frissítése az oldalon memóriában is
     itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
     scannedIndices.add(currentScanningItemIndex);
     lastScannedIndex = currentScanningItemIndex;
@@ -600,7 +635,7 @@ async function saveBatchAndConfirm() {
     renderMedicationTable();
 }
 
-// GYÓGYSZERELÉS LEZÁRÁSA (RUGALMAS ELLENŐRZÉSSEL)
+// GYÓGYSZERELÉS LEZÁRÁSA
 async function finishMedication() {
     if (!currentPrescriptionId) return;
 
@@ -608,7 +643,7 @@ async function finishMedication() {
     const scannedCount = scannedIndices.size;
 
     if (scannedCount < totalItems) {
-        const confirmFinish = confirm(`Figyelem: Csak ${scannedCount} db gyógyszer lett beolvasva a(z) ${totalItems} tételbőll!\n\nBiztosan le szeretné zárni a gyógyszerelést hianyos csippantással is?`);
+        const confirmFinish = confirm(`Figyelem: Csak ${scannedCount} db gyógyszer lett beolvasva a(z) ${totalItems} tételből!\n\nBiztosan le szeretné zárni a gyógyszerelést hiányos csippantással is?`);
         if (!confirmFinish) return;
     }
 
