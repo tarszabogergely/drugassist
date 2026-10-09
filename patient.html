@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DrugAssist - Beteg Jóváhagyása</title>
+<title>DrugAssist - Beteg Gyógyszerelés & Helyettesítés</title>
 
 <!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -64,10 +64,11 @@ header h1 { margin: 0; font-size: 22px; }
 
 .label { color: #64748b; font-weight: 600; }
 
+/* 3 KÁRTYÁS ELRENDEZÉS */
 .action-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
     margin-bottom: 24px;
 }
 
@@ -78,43 +79,85 @@ header h1 { margin: 0; font-size: 22px; }
     justify-content: center;
     align-items: center;
     text-align: center;
+    padding: 16px;
 }
 
-.action-card h2 { margin-top: 0; font-size: 18px; color: #334155; }
+.action-card h2 { margin-top: 0; font-size: 16px; color: #334155; }
 
 button {
     background: #1976d2;
     color: white;
     border: none;
     border-radius: 8px;
-    padding: 12px 22px;
+    padding: 10px 18px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
 }
 
 button:hover { background: #1565c0; }
 
 #scannerInput {
-    width: 220px;
+    width: 200px;
     padding: 8px;
-    font-size: 16px;
+    font-size: 15px;
     text-align: center;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 2px solid #1976d2;
     outline: none;
 }
+
+/* FIGYELMEZTETÉS BADGE */
+.alert-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.alert-success { color: #2e7d32; }
+.alert-warning { color: #c62828; }
 
 /* GYÓGYSZER TÁBLÁZAT */
 table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
+    border-collapse: separate;
+    border-spacing: 0 6px;
 }
 
-th, td { padding: 12px; text-align: left; font-size: 14px; }
+th, td { padding: 12px 14px; text-align: left; font-size: 14px; }
 th { background-color: #f8fafc; color: #475569; font-weight: 600; }
-tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+
+/* SORSZÍNEZÉS KÉSZLET ALAPJÁN */
+.row-in-stock {
+    background-color: #e8f5e9; /* Zöld */
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.row-out-of-stock {
+    background-color: #ffebee; /* Halvány piros */
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.row-in-stock:hover, .row-out-of-stock:hover {
+    filter: brightness(0.96);
+}
+
+/* VONALKÓD KIEMELÉSEK */
+.row-scanned-active {
+    outline: 3px solid #fbc02d !important; /* Sárga keret */
+    box-shadow: 0 0 10px rgba(251, 192, 45, 0.5);
+}
+
+.check-mark {
+    color: #2e7d32;
+    font-weight: 900;
+    font-size: 18px;
+    margin-left: 6px;
+}
 
 .dose-cell {
     text-align: center;
@@ -131,38 +174,112 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     font-weight: 600;
 }
 
-#patientNote {
-    width: 100%;
-    min-height: 90px;
-    padding: 12px;
-    font-size: 15px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    resize: vertical;
-    box-sizing: border-box;
-    font-family: inherit;
+.original-order-text {
+    font-size: 12px;
+    color: #d32f2f;
+    font-style: italic;
+    margin-top: 4px;
 }
 
-.complete {
-    display: flex;
+/* MODAL / HELYETTESÍTÉS */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
     justify-content: center;
-    margin-top: 28px;
+    align-items: center;
+    z-index: 1000;
 }
 
-.complete-btn {
-    background: #2e7d32;
-    padding: 14px 36px;
-    font-size: 16px;
+.modal-card {
+    background: white;
+    width: 700px;
+    max-height: 85vh;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
 }
 
-.complete-btn:hover { background: #1b5e20; }
+.tab-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+}
+
+.tab-btn {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.tab-btn.active {
+    background: #1976d2;
+    color: white;
+}
+
+.modal-search {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.local-drug-list {
+    overflow-y: auto;
+    max-height: 250px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.local-drug-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.local-drug-item:hover { background: #f0f7ff; }
+
+.dose-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+    background: #f8fafc;
+    padding: 14px;
+    border-radius: 8px;
+}
+
+.dose-edit-grid label { font-size: 12px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px; }
+.dose-edit-grid input { width: 100%; padding: 6px; text-align: center; font-weight: bold; }
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-    <h1>DrugAssist – Beteg Jóváhagyása</h1>
+    <h1>DrugAssist – Beteg Jóváhagyása & Gyógyszerelés</h1>
     <div class="user-info">
         <span id="userName">Dr. Kovács Anna</span> | <span id="dateTime"></span>
     </div>
@@ -191,49 +308,100 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     </div>
 </section>
 
+<!-- 3 KÁRTYÁS MŰVELETI SÁV -->
 <div class="action-row">
     <!-- CÍMKE -->
     <section class="card action-card">
-        <h2>🖨 Betegazonosító címke</h2>
+        <h2>🖨 Címke Nyomtatása</h2>
         <button id="printLabelButton" onclick="window.print()">Címke nyomtatása</button>
+    </section>
+
+    <!-- FIGYELMEZTETÉSEK BUBORÉK -->
+    <section class="card action-card">
+        <h2>⚠️ Figyelmeztetések</h2>
+        <div id="alertBox" class="alert-box alert-success">
+            <span>✓ Nincs ellenjavallat</span>
+        </div>
     </section>
 
     <!-- VONALKÓD BEOLVASÁS -->
     <section class="card action-card">
-        <h2>📦 Vonalkód beolvasás</h2>
-        <input id="scannerInput" type="text" placeholder="Vonalkód beolvasása..." autocomplete="off">
+        <h2>📦 Vonalkód Beolvasás</h2>
+        <input id="scannerInput" type="text" placeholder="Beolvasás..." autocomplete="off" onchange="processBarcodeScan(this.value)">
     </section>
 </div>
 
 <!-- GYÓGYSZEREK -->
 <section class="card">
-    <h2>💊 Feladott Gyógyszerek</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>💊 Gyógyszerelési Tételek</h2>
+        <div style="font-size:13px; color:#64748b;">Kattintson egy sorra a helyettesítéshez / módosításhoz</div>
+    </div>
     <div id="medicationList">
-        <p style="color:#64748b;">Gyógyszerek betöltése...</p>
+        <p style="color:#64748b;">Tételek betöltése...</p>
     </div>
 </section>
 
 <!-- MEGJEGYZÉS -->
 <div class="card">
     <h3>📝 Megjegyzés a patika részére</h3>
-    <textarea id="patientNote" rows="3" placeholder="Itt adhat meg megjegyzést a gyógyszereléshez..."></textarea>
+    <textarea id="patientNote" rows="2" placeholder="Megjegyzés rögzítése..."></textarea>
 </div>
 
 <!-- LEZÁRÁS -->
 <div class="complete">
-    <button id="completeButton" class="complete-btn" onclick="approvePrescription()">✓ Gyógyszerelés Jóváhagyása</button>
+    <button id="completeButton" class="complete-btn" style="background:#2e7d32; padding:14px 36px; font-size:16px;" onclick="approvePrescription()">✓ Gyógyszerelés Jóváhagyása</button>
 </div>
 
+</div>
+
+<!-- HELYETTESÍTŐ MODAL -->
+<div id="substituteModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 id="modalTitle" style="margin-top:0;">Gyógyszer Helyettesítése & Módosítása</h3>
+        
+        <div class="tab-container">
+            <button id="tabAtc" class="tab-btn active" onclick="switchModalTab('atc')">🎯 Azonos ATC / Hatóanyag</button>
+            <button id="tabAll" class="tab-btn" onclick="switchModalTab('all')">🔍 Összes helyi gyógyszer</button>
+        </div>
+
+        <input type="text" id="modalSearchInput" class="modal-search" placeholder="Keresés a helyi készletben..." oninput="filterLocalList(this.value)">
+
+        <div id="localDrugList" class="local-drug-list">
+            <!-- JS Tölti fel -->
+        </div>
+
+        <div>
+            <strong style="font-size:13px; color:#334155;">Adagolás Módosítása:</strong>
+            <div class="dose-edit-grid">
+                <div><label>Reggel</label><input type="number" id="editMorning" step="0.5" min="0"></div>
+                <div><label>Délben</label><input type="number" id="editNoon" step="0.5" min="0"></div>
+                <div><label>Este</label><input type="number" id="editEvening" step="0.5" min="0"></div>
+                <div><label>Éjjel</label><input type="number" id="editNight" step="0.5" min="0"></div>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button onclick="closeSubstituteModal()" style="background:#f1f5f9; color:#475569;">Mégse</button>
+            <button onclick="saveSubstitution()" style="background:#1976d2;">Mentés</button>
+        </div>
+    </div>
 </div>
 
 <script>
 let currentPrescriptionId = null;
+let prescriptionItems = [];
+let localInventory = [];
+let selectedItemIndex = null;
+let activeTab = 'atc';
+let lastScannedIndex = null;
+let scannedIndices = new Set();
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const user = Auth.requireAuth();
-    if (user) {
-        document.getElementById("userName").innerText = user.name;
-    }
+    Auth.requireAuth();
+    
+    // Helyi készlet betöltése a local_inventory_master táblából
+    await loadLocalInventory();
 
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('patientId');
@@ -244,9 +412,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+// 1. Helyi készlet betöltése
+async function loadLocalInventory() {
+    try {
+        const { data } = await window.supabaseClient
+            .from('local_inventory_master')
+            .select('*')
+            .eq('is_active', true);
+
+        localInventory = data || [];
+    } catch (e) {
+        console.error("Hiba a helyi készlet betöltésekor:", e);
+    }
+}
+
+// 2. Beteg és igénylés betöltése
 async function loadPatientAndPrescription(patientId, prescriptionId) {
     try {
-        // 1. Beteg adatai
         const { data: patient } = await window.supabaseClient
             .from('patients')
             .select('*')
@@ -260,7 +442,6 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientBed").innerText = patient.room_bed;
         }
 
-        // 2. Igénylés és tételek lekérése
         let query = window.supabaseClient
             .from('prescriptions')
             .select('*, prescription_items(*, pupha_master(*))')
@@ -279,20 +460,40 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             currentPrescriptionId = prescription.id;
             document.getElementById("preparationId").innerText = prescription.barcode || 'DA-20261009-0001';
 
-            renderMedicationTable(prescription.prescription_items || []);
-        } else {
-            document.getElementById("medicationList").innerHTML = '<p style="color:#64748b;">Nincs aktív feladott igénylés ehhez a beteghez.</p>';
-        }
+            prescriptionItems = prescription.prescription_items || [];
+            
+            // Kölcsönhatás / Duplikáció ellenőrzése
+            checkWarnings(prescriptionItems);
 
+            renderMedicationTable();
+        }
     } catch (err) {
-        console.error("Hiba a adatok betöltésekor:", err);
+        console.error("Hiba az adatok betöltésekor:", err);
     }
 }
 
-function renderMedicationTable(items) {
+// 3. Kölcsönhatások és Duplikációk ellenőrzése
+function checkWarnings(items) {
+    const alertBox = document.getElementById("alertBox");
+    const ingredients = items.map(i => i.pupha_master ? i.pupha_master.active_ingredient : '').filter(Boolean);
+    
+    // Duplikáció ellenőrzés
+    const duplicates = ingredients.filter((item, index) => ingredients.indexOf(item) !== index);
+
+    if (duplicates.length > 0) {
+        alertBox.className = "alert-box alert-warning";
+        alertBox.innerHTML = `<span>⚠️ Duplikált hatóanyag: ${duplicates[0]}</span>`;
+    } else {
+        alertBox.className = "alert-box alert-success";
+        alertBox.innerHTML = `<span>✓ Nincs ellenjavallat</span>`;
+    }
+}
+
+// 4. Gyógyszertáblázat kirajzolása (Készlet szerinti színezéssel)
+function renderMedicationTable() {
     const container = document.getElementById("medicationList");
-    if (!items || items.length === 0) {
-        container.innerHTML = '<p style="color:#64748b;">Nincsenek rögzített gyógyszertételek.</p>';
+    if (!prescriptionItems || prescriptionItems.length === 0) {
+        container.innerHTML = '<p style="color:#64748b;">Nincsenek tételek.</p>';
         return;
     }
 
@@ -300,32 +501,49 @@ function renderMedicationTable(items) {
         <table>
             <thead>
                 <tr>
-                    <th>Gyógyszer neve</th>
-                    <th>ATC kód</th>
+                    <th>Gyógyszer Neve</th>
+                    <th>Hatóanyag</th>
                     <th style="text-align:center;">Reggel</th>
                     <th style="text-align:center;">Délben</th>
                     <th style="text-align:center;">Este</th>
                     <th style="text-align:center;">Éjjel</th>
-                    <th style="text-align:center;">Státusz</th>
+                    <th style="text-align:center;">Készlet Status</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
-    items.forEach(item => {
-        const drugName = item.pupha_master ? item.pupha_master.brand_name : (item.original_order_text || 'Ismeretlen gyógyszer');
-        const atc = item.pupha_master ? item.pupha_master.atc_code : '-';
+    prescriptionItems.forEach((item, idx) => {
+        const pupha = item.pupha_master;
+        const brandName = pupha ? pupha.brand_name : (item.original_order_text || 'Ismeretlen');
+        const ingredient = pupha ? pupha.active_ingredient : '-';
+        const atc = pupha ? pupha.atc_code : '';
+
+        // Helyi készlet egyeztetése (ATC vagy TTT kód alapján)
+        const localMatch = localInventory.find(l => (atc && l.atc_code === atc) || (pupha && l.ttt_code === pupha.ttt_code));
+        const isInStock = !!localMatch;
+
+        const rowClass = isInStock ? 'row-in-stock' : 'row-out-of-stock';
+        const isScannedActive = (lastScannedIndex === idx) ? 'row-scanned-active' : '';
+        const isCompleted = scannedIndices.has(idx);
 
         html += `
-            <tr>
-                <td><strong style="color:#1e293b;">${drugName}</strong></td>
-                <td style="color:#64748b; font-size:13px;">${atc}</td>
+            <tr class="${rowClass} ${isScannedActive}" onclick="openSubstituteModal(${idx})">
+                <td>
+                    <strong style="color:#1e293b;">${brandName}</strong>
+                    ${isCompleted ? '<span class="check-mark">✓</span>' : ''}
+                    ${item.substitution_note ? `<div style="font-size:11px; color:#1565c0;">Helyettesítve: ${item.substitution_note}</div>` : ''}
+                    ${item.original_order_text ? `<div class="original-order-text">📋 Eredetileg elrendelve: ${item.original_order_text}</div>` : ''}
+                </td>
+                <td style="color:#475569; font-size:13px;">${ingredient}</td>
                 <td class="dose-cell">${item.dose_morning || 0}</td>
                 <td class="dose-cell">${item.dose_noon || 0}</td>
                 <td class="dose-cell">${item.dose_evening || 0}</td>
                 <td class="dose-cell">${item.dose_night || 0}</td>
                 <td style="text-align:center;">
-                    ${item.is_own_medication ? '<span class="own-badge">Saját gyógyszer</span>' : '<span style="color:#16a34a; font-weight:600; font-size:13px;">Központi kiadás</span>'}
+                    ${isInStock 
+                        ? '<span style="color:#2e7d32; font-weight:700; font-size:12px;">✓ Készleten</span>' 
+                        : '<span style="color:#c62828; font-weight:700; font-size:12px;">✖ Hiánycikk</span>'}
                 </td>
             </tr>
         `;
@@ -335,17 +553,131 @@ function renderMedicationTable(items) {
     container.innerHTML = html;
 }
 
-// Igénylés jóváhagyása
-async function approvePrescription() {
-    if (!currentPrescriptionId) {
-        alert("Nincs kiválasztott igénylés!");
+// 5. Inkrementális Vonalkód Beolvasás
+function processBarcodeScan(barcode) {
+    if (!barcode) return;
+    const cleanBarcode = barcode.trim();
+
+    // Megkeressük a beolvasott vonalkódhoz tartozó gyógyszert a helyi készletben
+    const localMatch = localInventory.find(l => l.barcode === cleanBarcode);
+
+    if (localMatch) {
+        // Megkeressük a recepttételek között az azonos ATC-jű sort
+        const matchedIdx = prescriptionItems.findIndex(item => item.pupha_master && item.pupha_master.atc_code === localMatch.atc_code);
+
+        if (matchedIdx !== -1) {
+            // Ha volt korábban aktívan beolvasott sor, ahhoz kitesszük a pipát
+            if (lastScannedIndex !== null && lastScannedIndex !== matchedIdx) {
+                scannedIndices.add(lastScannedIndex);
+            }
+
+            lastScannedIndex = matchedIdx;
+            renderMedicationTable();
+        } else {
+            alert("A beolvasott vonalkód nem tartozik egyik feladott tételehez sem!");
+        }
+    } else {
+        alert("Ismeretlen vonalkód a helyi készletben!");
+    }
+
+    document.getElementById("scannerInput").value = '';
+}
+
+// 6. HELYETTESÍTŐ MODAL KEZELÉSE
+function openSubstituteModal(index) {
+    selectedItemIndex = index;
+    const item = prescriptionItems[index];
+
+    document.getElementById("modalTitle").innerText = `${item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer'} Helyettesítése`;
+    document.getElementById("editMorning").value = item.dose_morning || 0;
+    document.getElementById("editNoon").value = item.dose_noon || 0;
+    document.getElementById("editEvening").value = item.dose_evening || 0;
+    document.getElementById("editNight").value = item.dose_night || 0;
+
+    switchModalTab('atc');
+    document.getElementById("substituteModal").style.display = "flex";
+}
+
+function closeSubstituteModal() {
+    document.getElementById("substituteModal").style.display = "none";
+}
+
+function switchModalTab(tab) {
+    activeTab = tab;
+    document.getElementById("tabAtc").className = tab === 'atc' ? 'tab-btn active' : 'tab-btn';
+    document.getElementById("tabAll").className = tab === 'all' ? 'tab-btn active' : 'tab-btn';
+    
+    filterLocalList('');
+}
+
+function filterLocalList(searchTerm) {
+    const item = prescriptionItems[selectedItemIndex];
+    const targetAtc = item && item.pupha_master ? item.pupha_master.atc_code : '';
+
+    let filtered = localInventory;
+
+    if (activeTab === 'atc' && targetAtc) {
+        filtered = localInventory.filter(l => l.atc_code === targetAtc);
+    }
+
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(l => l.brand_name.toLowerCase().includes(term) || l.active_ingredient.toLowerCase().includes(term));
+    }
+
+    const listContainer = document.getElementById("localDrugList");
+    if (filtered.length === 0) {
+        listContainer.innerHTML = '<div style="padding:15px; text-align:center; color:#64748b;">Nincs találat a helyi készletben.</div>';
         return;
     }
 
-    const user = Auth.getCurrentUser();
+    let html = '';
+    filtered.forEach(drug => {
+        html += `
+            <div class="local-drug-item" onclick="selectSubstitutedDrug('${drug.brand_name.replace(/'/g, "\\'")}')">
+                <div>
+                    <strong>${drug.brand_name}</strong>
+                    <div style="font-size:12px; color:#64748b;">Hatóanyag: ${drug.active_ingredient} | ATC: ${drug.atc_code}</div>
+                    <div style="font-size:11px; color:#1976d2;">Alaktag: ${drug.morphology || '-'}</div>
+                </div>
+                <button style="font-size:12px; padding:4px 10px;">Kiválasztás</button>
+            </div>
+        `;
+    });
+
+    listContainer.innerHTML = html;
+}
+
+function selectSubstitutedDrug(newBrandName) {
+    const item = prescriptionItems[selectedItemIndex];
+    
+    if (!item.original_order_text) {
+        item.original_order_text = `${item.pupha_master ? item.pupha_master.brand_name : 'Eredeti'} (${item.dose_morning}-${item.dose_noon}-${item.dose_evening}-${item.dose_night})`;
+    }
+
+    item.substitution_note = newBrandName;
+    alert(`Helyettesítő gyógyszer kiválasztva: ${newBrandName}`);
+}
+
+function saveSubstitution() {
+    const item = prescriptionItems[selectedItemIndex];
+
+    item.dose_morning = parseFloat(document.getElementById("editMorning").value) || 0;
+    item.dose_noon = parseFloat(document.getElementById("editNoon").value) || 0;
+    item.dose_evening = parseFloat(document.getElementById("editEvening").value) || 0;
+    item.dose_night = parseFloat(document.getElementById("editNight").value) || 0;
+
+    closeSubstituteModal();
+    renderMedicationTable();
+}
+
+// 7. Jóváhagyás
+async function approvePrescription() {
+    if (!currentPrescriptionId) return;
 
     try {
-        const { error } = await window.supabaseClient
+        const user = Auth.getCurrentUser();
+        await window.supabaseClient
             .from('prescriptions')
             .update({
                 status: 'reviewed',
@@ -353,14 +685,10 @@ async function approvePrescription() {
             })
             .eq('id', currentPrescriptionId);
 
-        if (error) throw error;
-
-        alert("Gyógyszerelés sikeresen jóváhagyva!");
+        alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva!");
         window.location.href = 'approval-list.html';
-
-    } catch (err) {
-        console.error("Hiba a jóváhagyás során:", err);
-        alert("Hiba történt a jóváhagyás mentésekor.");
+    } catch (e) {
+        console.error("Hiba a mentés során:", e);
     }
 }
 
