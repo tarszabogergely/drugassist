@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Betegek</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+/* ===== HEADER ===== */
+
+header {
+    background: white;
+    padding: 14px 30px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 {
+    margin: 0;
+    font-size: 18px;
+    color: #1565c0;
+}
+
+.header-right {
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* ===== CONTAINER ===== */
+
+.container {
+    padding: 30px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* ===== SEARCH ===== */
+
+.search-bar {
+    margin-bottom: 0;
+}
+
+.search-input {
+    width: 350px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-input:focus {
+    border-color: #1976d2;
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+/* ===== FILTER BUBBLES ===== */
+
+.filter-bar {
+    display: flex;
+    gap: 12px;
+}
+
+.filter-btn {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    background-color: #e0e0e0;
+    color: #475569;
+    font-weight: 600;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.filter-btn.active {
+    background-color: #1976d2;
+    color: white;
+}
+
+/* ===== TABLE ===== */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+th, td {
+    padding: 14px 16px;
+    font-size: 14px;
+}
+
+th {
+    background-color: #f0f2f5;
+    text-align: left;
+    color: #475569;
+    font-weight: 600;
+}
+
+tr:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
+
+tr:hover {
+    background-color: #fafafa;
+}
+
+.open-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    background-color: #4caf50;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.open-btn:hover {
+    background-color: #43a047;
+}
+
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-active-badge { background: #e8f5e9; color: #2e7d32; }
+.status-inactive-badge { background: #f1f5f9; color: #64748b; }
+
+.empty-msg {
+    padding: 30px;
+    text-align: center;
+    color: #64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Betegek</h1>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
+        <div><span id="userName">Kovács Anna</span> | <span id="dateTime"></span></div>
+    </div>
+</header>
+
+<div class="container">
+
+<div class="top-bar">
+    <!-- SEARCH -->
+    <div class="search-bar">
+        <input type="text" class="search-input"
+               placeholder="Keresés név, TAJ vagy osztály alapján..."
+               onkeyup="searchTable(this.value)">
+    </div>
+
+    <!-- FILTER -->
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter(event,'active')">
+            Aktív betegek
+        </button>
+        <button class="filter-btn" onclick="setFilter(event,'all')">
+            Összes beteg
+        </button>
+    </div>
+</div>
+
+<!-- TABLE -->
+
+<table>
+    <thead>
+        <tr>
+            <th>Név</th>
+            <th>Életkor</th>
+            <th>TAJ</th>
+            <th>Utolsó osztály</th>
+            <th>Utolsó igény</th>
+            <th style="text-align: right;">Aktivitás</th>
+        </tr>
+    </thead>
+    <tbody id="patientTable">
+        <tr>
+            <td colspan="6" class="empty-msg">Adatok betöltése...</td>
+        </tr>
+    </tbody>
+</table>
+
+</div>
+
+<script>
+let allPatients = [];
+let currentFilter = 'active';
+
+document.addEventListener("DOMContentLoaded", () => {
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+    }
+    
+    loadPatients();
+});
+
+/* DATETIME */
+
+function updateDateTime() {
+    const now = new Date();
+    const date = now.toLocaleDateString("hu-HU");
+    const time = now.toLocaleTimeString("hu-HU", {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    document.getElementById("dateTime").innerText = date + " | " + time;
+}
+
+updateDateTime();
+setInterval(updateDateTime, 10000);
+
+/* SUPABASE ADATOK BETÖLTÉSE */
+
+async function loadPatients() {
+    const tbody = document.getElementById("patientTable");
+
+    try {
+        // 1. Betegek lekérése
+        const { data: patients, error: pErr } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (pErr) throw pErr;
+
+        if (!patients || patients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Nincsenek rögzített betegek az adatbázisban.</td></tr>';
+            return;
+        }
+
+        // 2. Legfrissebb igénylések lekérése
+        const patientIds = patients.map(p => p.id);
+        const { data: prescriptions, error: prErr } = await window.supabaseClient
+            .from('prescriptions')
+            .select('patient_id, created_at')
+            .in('patient_id', patientIds)
+            .order('created_at', { ascending: false });
+
+        const latestPrescriptionMap = {};
+        if (prescriptions) {
+            prescriptions.forEach(pr => {
+                if (!latestPrescriptionMap[pr.patient_id]) {
+                    latestPrescriptionMap[pr.patient_id] = pr.created_at;
+                }
+            });
+        }
+
+        allPatients = patients.map(p => {
+            const age = calculateAge(p.birth_date);
+            const lastPrescDate = latestPrescriptionMap[p.id] 
+                ? new Date(latestPrescriptionMap[p.id]).toLocaleDateString('hu-HU') 
+                : '-';
+
+            return {
+                ...p,
+                ageDisplay: age ? `${age} év` : '-',
+                lastPrescDate: lastPrescDate,
+                isActive: p.status === 'active' || p.status === true
+            };
+        });
+
+        renderTable();
+
+    } catch (err) {
+        console.error("Hiba a betegek betöltésekor:", err);
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-msg" style="color:#c62828;">Hiba történt az adatok betöltése során.</td></tr>';
+    }
+}
+
+/* ÉLETKOR KISZÁMÍTÁSA */
+
+function calculateAge(birthDateStr) {
+    if (!birthDateStr) return null;
+    const birthDate = new Date(birthDateStr);
+    if (isNaN(birthDate)) return null;
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+/* TÁBLÁZAT KIRAJZOLÁSA */
+
+function renderTable() {
+    const tbody = document.getElementById("patientTable");
+    const searchTerm = document.querySelector(".search-input").value.toLowerCase();
+
+    let filtered = allPatients;
+
+    // 1. Szűrő gomb szerinti szűrés
+    if (currentFilter === 'active') {
+        filtered = filtered.filter(p => p.isActive);
+    }
+
+    // 2. Keresőmező szűrés
+    if (searchTerm) {
+        filtered = filtered.filter(p => 
+            (p.name && p.name.toLowerCase().includes(searchTerm)) ||
+            (p.taj && p.taj.toString().includes(searchTerm)) ||
+            (p.department && p.department.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Nincs a szűrésnek megfelelő beteg.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(p => {
+        html += `
+            <tr data-status="${p.isActive ? 'active' : 'all'}">
+                <td><strong style="color:#1e293b;">${p.name}</strong></td>
+                <td>${p.ageDisplay}</td>
+                <td style="font-family:monospace;">${p.taj || '-'}</td>
+                <td>${p.department || '-'}</td>
+                <td style="color:#64748b;">${p.lastPrescDate}</td>
+                <td style="text-align: right;">
+                    <button class="open-btn" onclick="location.href='patient-detail.html?patientId=${p.id}'">Megnyitás</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+/* SEARCH & FILTER HANDLERS */
+
+function searchTable(value) {
+    renderTable();
+}
+
+function setFilter(event, type) {
+    document.querySelectorAll(".filter-btn")
+        .forEach(btn => btn.classList.remove("active"));
+
+    event.target.classList.add("active");
+    currentFilter = type;
+    renderTable();
+}
+</script>
+
+</body>
+</html>
