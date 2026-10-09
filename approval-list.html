@@ -5,9 +5,10 @@
 <title>DrugAssist – Jóváhagyásra vár</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
 body {
@@ -28,6 +29,12 @@ header {
 h1 {
     margin: 0;
     font-size: 20px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
 .container {
@@ -79,6 +86,11 @@ tr:hover {
     color: white;
     cursor: pointer;
     font-size: 13px;
+    font-weight: 600;
+}
+
+.action-btn:hover {
+    background-color: #1565c0;
 }
 
 .badge {
@@ -88,6 +100,15 @@ tr:hover {
     padding: 3px 8px;
     border-radius: 12px;
 }
+
+.empty-msg {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    color: #666;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
 </style>
 </head>
 
@@ -95,77 +116,106 @@ tr:hover {
 
 <header>
     <h1>DrugAssist – Jóváhagyásra vár</h1>
-    <div id="dateTime"></div>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
+        <div id="dateTime"></div>
+    </div>
 </header>
 
-<div class="container">
-
-    <!-- BELGYÓGYÁSZAT -->
-    <div class="section">
-        <div class="section-title">
-            Belgyógyászat <span class="badge">6 beteg</span>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Beteg neve</th>
-                    <th>Ágy</th>
-                    <th>Utolsó módosítás</th>
-                    <th>Gyógyszersorok</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Kovács János</td>
-                    <td>12/B</td>
-                    <td>07:42</td>
-                    <td>8</td>
-                    <td><button class="action-btn" onclick="location.href='patient.html'">Jóváhagyás</button></td>
-                </tr>
-                <tr>
-                    <td>Nagy Péter</td>
-                    <td>14/A</td>
-                    <td>08:10</td>
-                    <td>6</td>
-                    <td><button class="action-btn" onclick="location.href='patient.html'">Jóváhagyás</button></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- SEBÉSZET -->
-    <div class="section">
-        <div class="section-title">
-            Sebészet <span class="badge">2 beteg</span>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Beteg neve</th>
-                    <th>Ágy</th>
-                    <th>Utolsó módosítás</th>
-                    <th>Gyógyszersorok</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Tóth László</td>
-                    <td>5/A</td>
-                    <td>07:55</td>
-                    <td>5</td>
-                    <td><button class="action-btn" onclick="location.href='patient.html'">Jóváhagyás</button></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
+<div id="contentContainer" class="container">
+    <div class="empty-msg">Adatok betöltése...</div>
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+    Auth.requireAuth();
+    loadApprovalList();
+});
+
+async function loadApprovalList() {
+    const container = document.getElementById("contentContainer");
+
+    try {
+        // 1. Submitted státuszú igénylések lekérése beteg- és tételtadattal
+        const { data: prescriptions, error } = await window.supabaseClient
+            .from('prescriptions')
+            .select('id, created_at, patient_id, patients(name, room_bed, department), prescription_items(id)')
+            .eq('status', 'submitted')
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!prescriptions || prescriptions.length === 0) {
+            container.innerHTML = '<div class="empty-msg">Jelenleg nincs jóváhagyásra váró gyógyszerigénylés.</div>';
+            return;
+        }
+
+        // 2. Csoportosítás osztályok szerint
+        const groupedByDept = {};
+        prescriptions.forEach(p => {
+            const dept = p.patients ? p.patients.department : 'Ismeretlen';
+            if (!groupedByDept[dept]) {
+                groupedByDept[dept] = [];
+            }
+            groupedByDept[dept].push(p);
+        });
+
+        // 3. HTML generálása osztályonként
+        let html = '';
+        for (const [dept, list] of Object.entries(groupedByDept)) {
+            html += `
+                <div class="section">
+                    <div class="section-title">
+                        ${dept} <span class="badge">${list.length} beteg</span>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Beteg neve</th>
+                                <th>Ágy</th>
+                                <th>Utolsó módosítás</th>
+                                <th>Gyógyszersorok</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            list.forEach(p => {
+                const timeStr = new Date(p.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+                const itemCount = p.prescription_items ? p.prescription_items.length : 0;
+                const patientName = p.patients ? p.patients.name : 'Ismeretlen';
+                const bed = p.patients ? p.patients.room_bed : '-';
+
+                html += `
+                    <tr>
+                        <td><strong>${patientName}</strong></td>
+                        <td>${bed}</td>
+                        <td>${timeStr}</td>
+                        <td>${itemCount} tétel</td>
+                        <td style="text-align: right;">
+                            <button class="action-btn" onclick="location.href='patient.html?patientId=${p.patient_id}&prescriptionId=${p.id}'">Jóváhagyás</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+
+    } catch (err) {
+        console.error("Hiba a lista betöltésekor:", err);
+        container.innerHTML = '<div class="empty-msg">Hiba történt az adatok betöltése során.</div>';
+    }
+}
+
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
