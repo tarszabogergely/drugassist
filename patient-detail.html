@@ -177,7 +177,7 @@ tr:hover {
     <div class="patient-name" id="patientName">Beteg betöltése...</div>
     <div class="patient-info">
         TAJ: <span id="patientTaj" style="font-family:monospace; font-weight:bold;">-</span><br>
-        Születési év: <span id="patientBirthYear">-</span><br>
+        Születési dátum: <span id="patientBirthDate">-</span><br>
         Utolsó osztály: <span id="patientDept">-</span><br>
         Jelenlegi státusz: <span id="patientCurrentStatus" class="status-gray">Nincs adatsor</span>
     </div>
@@ -256,8 +256,23 @@ async function loadPatientDetail(patientId) {
             document.getElementById("patientName").innerText = patient.name;
             document.getElementById("patientTaj").innerText = patient.taj || '-';
             
-            const birthYear = patient.birth_date ? new Date(patient.birth_date).getFullYear() : '-';
-            document.getElementById("patientBirthYear").innerText = birthYear;
+            // Születési dátum és életkor formázása
+if (patient.birth_date) {
+    const bDate = new Date(patient.birth_date);
+    const formattedDate = bDate.toLocaleDateString('hu-HU');
+    
+    // Életkor kiszámítása
+    const today = new Date();
+    let age = today.getFullYear() - bDate.getFullYear();
+    const m = today.getMonth() - bDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+        age--;
+    }
+    
+    document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+} else {
+    document.getElementById("patientBirthDate").innerText = '-';
+}
             document.getElementById("patientDept").innerText = patient.department || '-';
         }
 
