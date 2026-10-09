@@ -77,11 +77,11 @@ header h1 {
 
 .logout-btn:hover { background: #ffcdd2; }
 
-/* ===== CONTAINER ===== */
+/* ===== CONTAINER (SZÉLES ELRENDEZÉS) ===== */
 .container {
     padding: 32px;
-    max-width: 1200px;
-    margin: auto;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .section-title-main {
@@ -94,7 +94,7 @@ header h1 {
 /* ===== STATUS CARDS ===== */
 .status-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 20px;
     margin-bottom: 40px;
 }
@@ -172,15 +172,6 @@ header h1 {
     line-height: 1.6;
 }
 
-.ward-badge-count {
-    background: #e2e8f0;
-    color: #334155;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 12px;
-}
-
 .ward-indicator {
     width: 50px;
     height: 50px;
@@ -209,7 +200,7 @@ header h1 {
 .bottom-actions {
     margin-top: 40px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 20px;
 }
 
@@ -292,7 +283,7 @@ header h1 {
     </div>
 </div>
 
-<!-- ===== OSZTÁLYOK DÍNÁMIKUS LISTÁJA ===== -->
+<!-- ===== OSZTÁLYOK DINAMIKUS LISTÁJA ===== -->
 <div class="section-title-main">🏥 Aktív Igényléssel Rendelkező Osztályok</div>
 <div id="wardGridContainer" class="ward-grid">
     <div class="no-data-msg">Adatok betöltése...</div>
@@ -300,21 +291,21 @@ header h1 {
 
 <!-- ===== KISZEGGÉS ÉS GYORSIKONOK ===== -->
 <div class="bottom-actions">
-    <div class="icon-button" onclick="location.href='doctor-dashboard.html'">
-        <div class="icon">🏥</div>
-        <div class="icon-text">Osztályos Nézet</div>
-    </div>
-    <div class="icon-button" onclick="location.href='approval-list.html'">
+    <div class="icon-button" onclick="location.href='drugs.html'">
         <div class="icon">💊</div>
-        <div class="icon-text">Patikai Jóváhagyás</div>
+        <div class="icon-text">Gyógyszerek</div>
+    </div>
+    <div class="icon-button" onclick="location.href='report.html'">
+        <div class="icon">📊</div>
+        <div class="icon-text">Kimutatás</div>
     </div>
     <div class="icon-button" onclick="location.href='patients.html'">
         <div class="icon">👤</div>
         <div class="icon-text">Betegek</div>
     </div>
     <div class="icon-button">
-        <div class="icon">📊</div>
-        <div class="icon-text">Kimutatás</div>
+        <div class="icon">⚙</div>
+        <div class="icon-text">Beállítások</div>
     </div>
 </div>
 
@@ -332,21 +323,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const deptSel = document.getElementById("deptSelector");
         if (deptSel) deptSel.value = user.activeDepartment || 'Belgyógyászat';
 
-        // Élő dashboard adatok betöltése Supabase-ből
         loadDashboardData();
     }
 });
 
 async function loadDashboardData() {
     try {
-        // 1. Az összes igénylés és a hozzájuk tartozó betegek lekérése
         const { data: prescriptions, error: pErr } = await window.supabaseClient
             .from('prescriptions')
             .select('id, status, patient_id');
 
         if (pErr) throw pErr;
 
-        // Státusz számlálók inicializálása
         let cntSubmitted = 0;
         let cntReviewed = 0;
         let cntDispensed = 0;
@@ -363,13 +351,11 @@ async function loadDashboardData() {
             });
         }
 
-        // Felső kártyák frissítése
         document.getElementById("cntSubmitted").innerText = cntSubmitted;
         document.getElementById("cntReviewed").innerText = cntReviewed;
         document.getElementById("cntDispensed").innerText = cntDispensed;
         document.getElementById("cntCompleted").innerText = cntCompleted;
 
-        // 2. Osztályok szerinti csoportosítás
         if (patientIds.length === 0) {
             document.getElementById("wardGridContainer").innerHTML = '<div class="no-data-msg">Jelenleg nincs aktív gyógyszerigénylés egyetlen osztályon sem.</div>';
             return;
@@ -389,7 +375,6 @@ async function loadDashboardData() {
             });
         }
 
-        // Osztályonkénti igénylések és státuszok számlálása
         const wardStats = {};
 
         prescriptions.forEach(p => {
@@ -412,7 +397,6 @@ async function loadDashboardData() {
             }
         });
 
-        // 3. Osztályos buborékok generálása
         const wardContainer = document.getElementById("wardGridContainer");
         let html = '';
 
@@ -431,7 +415,6 @@ async function loadDashboardData() {
                 indicatorIcon = '✓';
             }
 
-            // Státusz részletezés összeállítása
             let statusDetails = [];
             if (stats.submitted > 0) statusDetails.push(`<strong>${stats.submitted}</strong> Jóváhagyásra vár`);
             if (stats.reviewed > 0) statusDetails.push(`<strong>${stats.reviewed}</strong> Gyógyszerelésre vár`);
