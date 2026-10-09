@@ -28,7 +28,7 @@ header {
     align-items: center;
 }
 
-header h1 { margin: 0; font-size: 22px; }
+header h1 { margin: 0; font-size: 22px; color: #1565c0; }
 .user-info { color: #666; font-size: 14px; }
 
 .container {
@@ -64,7 +64,7 @@ header h1 { margin: 0; font-size: 22px; }
 
 .label { color: #64748b; font-weight: 600; }
 
-/* 2 KÁRTYÁS MŰVELETI SÁV (VONALKÓDOLVASÓ NÉLKÜL) */
+/* 2 KÁRTYÁS MŰVELETI SÁV */
 .action-row {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -429,12 +429,10 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientName").innerText = patient.name;
             document.getElementById("patientTaj").innerText = patient.taj || '-';
             
-            // Születési dátum és életkor formázása
             if (patient.birth_date) {
                 const bDate = new Date(patient.birth_date);
                 const formattedDate = bDate.toLocaleDateString('hu-HU');
                 
-                // Életkor kiszámítása
                 const today = new Date();
                 let age = today.getFullYear() - bDate.getFullYear();
                 const m = today.getMonth() - bDate.getMonth();
@@ -467,6 +465,7 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
         if (prescription) {
             currentPrescriptionId = prescription.id;
             document.getElementById("preparationId").innerText = prescription.barcode || 'DA-20261009-0001';
+            document.getElementById("patientNote").value = prescription.pharmacy_notes || '';
             prescriptionItems = prescription.prescription_items || [];
             
             checkWarnings(prescriptionItems);
@@ -634,7 +633,7 @@ function filterLocalList(searchTerm) {
     let html = '';
     filtered.forEach(drug => {
         html += `
-            <div class="local-drug-item" onclick="selectSubstitutedDrug('${drug.brand_name.replace(/'/g, "\\'")}', '${drug.active_ingredient.replace(/'/g, "\\'")}')">
+            <div class="local-drug-item" onclick="selectSubstitutedDrug('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${drug.active_ingredient.replace(/'/g, "\\'")}')">
                 <div>
                     <strong style="color:#1e293b;">${drug.brand_name}</strong>
                     <div style="font-size:12px; color:#64748b;">Hatóanyag: ${drug.active_ingredient} | ATC: ${drug.atc_code}</div>
@@ -647,8 +646,9 @@ function filterLocalList(searchTerm) {
     listContainer.innerHTML = html;
 }
 
-function selectSubstitutedDrug(newBrandName, newIngredient) {
+function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
     const item = prescriptionItems[selectedItemIndex];
+    item.local_drug_id = localDrugId; // local_drug_id elmentése
     item.substituted_name = newBrandName;
     item.substituted_ingredient = newIngredient;
     alert(`Helyettesítve erre: ${newBrandName}`);
@@ -674,24 +674,44 @@ async function approvePrescription() {
 
     if (!currentPrescriptionId) return;
 
-    // Megjegyzés kiolvasása a beviteli mezőből
     const noteText = document.getElementById("patientNote").value.trim();
 
     try {
         const user = Auth.getCurrentUser();
 
+        // 1. Módosított/Helyettesített tételek mentése a prescription_items táblába
+        for (const item of prescriptionItems) {
+            const { error: itemErr } = await window.supabaseClient
+                .from('prescription_items')
+                .update({
+                    local_drug_id: item.local_drug_id || null,
+                    substituted_name: item.substituted_name || null,
+                    substituted_ingredient: item.substituted_ingredient || null,
+                    dose_morning: item.dose_morning || 0,
+                    dose_noon: item.dose_noon || 0,
+                    dose_evening: item.dose_evening || 0,
+                    dose_night: item.dose_night || 0
+                })
+                .eq('id', item.id);
+
+            if (itemErr) {
+                console.error("Hiba a tétel mentésekor:", itemErr);
+            }
+        }
+
+        // 2. Igénylés lezárása / státusz frissítése
         const { error } = await window.supabaseClient
             .from('prescriptions')
             .update({
                 status: 'reviewed',
                 reviewed_by: user ? user.id : null,
-                pharmacy_notes: noteText // <-- Elmenti a megjegyzést
+                pharmacy_notes: noteText
             })
             .eq('id', currentPrescriptionId);
 
         if (error) throw error;
 
-        alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva!");
+        alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva és elmentve!");
         window.location.href = 'approval-list.html';
     } catch (e) {
         console.error("Hiba a mentés során:", e);
