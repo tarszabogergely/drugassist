@@ -539,12 +539,10 @@ async function openBatchModal(drug) {
     listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Meglévő sarzsok keresése...</div>';
 
     try {
-        // Lekérés az inventory_batches táblából az adott gyógyszer nevére (kis/nagybetű függetlenül)
         const { data: batches, error } = await window.supabaseClient
             .from('inventory_batches')
             .select('*')
-            .ilike('drug_name', drug.brand_name.trim())
-            .order('expiry_date', { ascending: true });
+            .ilike('drug_name', drug.brand_name.trim());
 
         if (error) {
             console.error("inventory_batches lekérdezési hiba:", error);
@@ -553,17 +551,22 @@ async function openBatchModal(drug) {
         if (batches && batches.length > 0) {
             let html = '';
             batches.forEach(b => {
-                html += `
-                    <div class="batch-item" onclick="selectExistingBatch('${b.lot_number.replace(/'/g, "\\'")}', '${b.expiry_date}')">
-                        <div>
-                            <strong>LOT: ${b.lot_number}</strong>
-                            <div style="font-size:12px; color:#64748b;">Lejárat: ${b.expiry_date}</div>
+                const lotVal = b.lot_number || b.batch_number || '';
+                const expVal = b.expiry_date || b.expiration_date || '';
+
+                if (lotVal && expVal) {
+                    html += `
+                        <div class="batch-item" onclick="selectExistingBatch('${lotVal.replace(/'/g, "\\'")}', '${expVal}')">
+                            <div>
+                                <strong>LOT: ${lotVal}</strong>
+                                <div style="font-size:12px; color:#64748b;">Lejárat: ${expVal}</div>
+                            </div>
+                            <button style="font-size:11px; padding:3px 8px;">Kiválasztás</button>
                         </div>
-                        <button style="font-size:11px; padding:3px 8px;">Kiválasztás</button>
-                    </div>
-                `;
+                    `;
+                }
             });
-            listContainer.innerHTML = html;
+            listContainer.innerHTML = html || '<div style="padding:10px; font-size:12px; color:#64748b;">Nincs korábbi rögzített sarzs ehhez a gyógyszerhez.</div>';
         } else {
             listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Nincs korábbi rögzített sarzs ehhez a gyógyszerhez.</div>';
         }
@@ -585,7 +588,6 @@ async function saveBatchAndConfirm() {
     }
 
     const currentItem = prescriptionItems[currentScanningItemIndex];
-    // Ha a currentScanningDrug nem érhető el, a tétel mentett nevével próbálkozunk
     const pupha = currentItem ? currentItem.pupha_master : null;
     const drugName = (currentScanningDrug && currentScanningDrug.brand_name) 
         || (currentItem ? (currentItem.substituted_name || (pupha ? pupha.brand_name : '')) : '').trim();
@@ -593,15 +595,15 @@ async function saveBatchAndConfirm() {
     const tttCode = (currentScanningDrug && currentScanningDrug.ttt_code) 
         || (pupha ? pupha.ttt_code : null);
 
-    console.log("Sarzs mentése a következő adatokkal:", { drugName, tttCode, lot, exp });
-
     try {
-        // 1. Közvetlen beszúrás/frissítés az inventory_batches táblába
+        // 1. Mindkét oszlopnév-párt kitöltjük az inventory_batches táblában
         const batchPayload = {
             drug_name: drugName,
             ttt_code: tttCode,
             lot_number: lot,
-            expiry_date: exp
+            batch_number: lot,            // feloldja a batch_number NOT NULL kényszert
+            expiry_date: exp,
+            expiration_date: exp         // feloldja az expiration_date NOT NULL kényszert
         };
 
         const { data: batchData, error: batchErr } = await window.supabaseClient
@@ -612,6 +614,7 @@ async function saveBatchAndConfirm() {
         if (batchErr) {
             console.error("inventory_batches beszúrási hiba:", batchErr);
             alert(`Hiba az inventory_batches táblába mentéskor:\n${batchErr.message} (Kód: ${batchErr.code})`);
+            return;
         } else {
             console.log("Sikeresen elmentve az inventory_batches táblába:", batchData);
         }
