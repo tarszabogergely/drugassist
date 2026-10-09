@@ -290,6 +290,8 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
     <div class="patient-data">
         <div class="label">Azonosító</div>
         <div id="patientTaj">TAJ: -</div>
+        <div class="label">Születési dátum</div>
+        <div id="patientBirthDate">-</div>
         <div class="label">Osztály</div>
         <div id="patientWard">-</div>
         <div class="label">Ágy</div>
@@ -425,9 +427,27 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
 
         if (patient) {
             document.getElementById("patientName").innerText = patient.name;
-            document.getElementById("patientTaj").innerText = `TAJ: ${patient.taj}`;
-            document.getElementById("patientWard").innerText = patient.department;
-            document.getElementById("patientBed").innerText = patient.room_bed;
+            document.getElementById("patientTaj").innerText = `TAJ: ${patient.taj || '-'}`;
+            
+            // Születési dátum és életkor formázása
+            if (patient.birth_date) {
+                const bDate = new Date(patient.birth_date);
+                const formattedDate = bDate.toLocaleDateString('hu-HU');
+                
+                // Életkor kiszámítása
+                const today = new Date();
+                let age = today.getFullYear() - bDate.getFullYear();
+                const m = today.getMonth() - bDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+                    age--;
+                }
+                document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+            } else {
+                document.getElementById("patientBirthDate").innerText = '-';
+            }
+
+            document.getElementById("patientWard").innerText = patient.department || '-';
+            document.getElementById("patientBed").innerText = patient.room_bed || '-';
         }
 
         let query = window.supabaseClient
