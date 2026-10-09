@@ -26,10 +26,7 @@ header {
     align-items: center;
 }
 
-h1 {
-    margin: 0;
-    font-size: 20px;
-}
+h1 { margin: 0; font-size: 20px; }
 
 .header-right {
     display: flex;
@@ -37,13 +34,8 @@ h1 {
     gap: 15px;
 }
 
-.container {
-    padding: 30px;
-}
-
-.section {
-    margin-bottom: 40px;
-}
+.container { padding: 30px; }
+.section { margin-bottom: 40px; }
 
 .section-title {
     font-size: 18px;
@@ -60,23 +52,10 @@ table {
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
 }
 
-th, td {
-    padding: 14px;
-    font-size: 14px;
-}
-
-th {
-    background-color: #f0f2f5;
-    text-align: left;
-}
-
-tr:not(:last-child) {
-    border-bottom: 1px solid #eee;
-}
-
-tr:hover {
-    background-color: #fafafa;
-}
+th, td { padding: 14px; font-size: 14px; }
+th { background-color: #f0f2f5; text-align: left; }
+tr:not(:last-child) { border-bottom: 1px solid #eee; }
+tr:hover { background-color: #fafafa; }
 
 .action-btn {
     padding: 6px 12px;
@@ -90,9 +69,7 @@ tr:hover {
     transition: 0.2s;
 }
 
-.action-btn:hover {
-    background-color: #43a047;
-}
+.action-btn:hover { background-color: #43a047; }
 
 .badge {
     background-color: #2196f3;
@@ -137,16 +114,16 @@ async function loadMedicationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. Reviewed (jóváhagyott) igénylések és a hozzájuk tartozó betegek lekérése
-        const { data: prescriptions, error } = await window.supabaseClient
+        // 1. LÉPÉS: 'reviewed' (jóváhagyott) igénylések lekérése JOIN nélkül
+        const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, updated_at, created_at, patient_id, patients(name, room_bed, department)')
+            .select('id, updated_at, created_at, patient_id')
             .eq('status', 'reviewed')
             .order('updated_at', { ascending: false });
 
-        if (error) {
-            console.error("Supabase lekérdezési hiba:", error);
-            throw error;
+        if (prescError) {
+            console.error("Prescriptions lekérdezési hiba:", prescError);
+            throw prescError;
         }
 
         if (!prescriptions || prescriptions.length === 0) {
@@ -154,17 +131,39 @@ async function loadMedicationList() {
             return;
         }
 
-        // 2. Csoportosítás osztályok szerint
+        // 2. LÉPÉS: Beteg adatok lekérése a kapott patient_id-k alapján
+        const patientIds = [...new Set(prescriptions.map(p => p.patient_id).filter(Boolean))];
+        
+        let patientsMap = {};
+        if (patientIds.length > 0) {
+            const { data: patients, error: patientError } = await window.supabaseClient
+                .from('patients')
+                .select('id, name, room_bed, department')
+                .in('id', patientIds);
+
+            if (!patientError && patients) {
+                patients.forEach(pat => {
+                    patientsMap[pat.id] = pat;
+                });
+            }
+        }
+
+        // 3. LÉPÉS: Csoportosítás osztályok szerint
         const groupedByDept = {};
         prescriptions.forEach(p => {
-            const dept = (p.patients && p.patients.department) ? p.patients.department : 'Központi Osztály';
+            const patient = patientsMap[p.patient_id];
+            const dept = (patient && patient.department) ? patient.department : 'Központi Osztály';
             if (!groupedByDept[dept]) {
                 groupedByDept[dept] = [];
             }
-            groupedByDept[dept].push(p);
+            groupedByDept[dept].push({
+                ...p,
+                patientName: patient ? patient.name : 'Ismeretlen beteg',
+                bed: patient ? patient.room_bed : '-'
+            });
         });
 
-        // 3. HTML generálása osztályonként
+        // 4. LÉPÉS: HTML generálása
         let html = '';
         for (const [dept, list] of Object.entries(groupedByDept)) {
             html += `
@@ -186,20 +185,18 @@ async function loadMedicationList() {
                         <tbody>
             `;
 
-            list.forEach(p => {
-                const timeSource = p.updated_at || p.created_at;
+            list.forEach(item => {
+                const timeSource = item.updated_at || item.created_at;
                 const timeStr = timeSource ? new Date(timeSource).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
-                const patientName = (p.patients && p.patients.name) ? p.patients.name : 'Ismeretlen beteg';
-                const bed = (p.patients && p.patients.room_bed) ? p.patients.room_bed : '-';
 
                 html += `
                     <tr>
-                        <td><strong>${patientName}</strong></td>
-                        <td>${bed}</td>
+                        <td><strong>${item.patientName}</strong></td>
+                        <td>${item.bed}</td>
                         <td>${timeStr}</td>
                         <td><span style="color:#2e7d32; font-weight:600;">✓ Jóváhagyva</span></td>
                         <td style="text-align: right;">
-                            <button class="action-btn" onclick="location.href='patient.html?patientId=${p.patient_id}&prescriptionId=${p.id}'">Gyógyszerelés</button>
+                            <button class="action-btn" onclick="location.href='patient.html?patientId=${item.patient_id}&prescriptionId=${item.id}'">Gyógyszerelés</button>
                         </td>
                     </tr>
                 `;
@@ -215,8 +212,8 @@ async function loadMedicationList() {
         container.innerHTML = html;
 
     } catch (err) {
-        console.error("Hiba a lista betöltésekor:", err);
-        container.innerHTML = '<div class="empty-msg">Hiba történt az adatok betöltése során. Kérjük, ellenőrizze a hálózati kapcsolatot!</div>';
+        console.error("Részletes hiba a lista betöltésekor:", err);
+        container.innerHTML = `<div class="empty-msg">Hiba történt az adatok betöltése során (${err.message || 'Adatbázis hiba'}).</div>`;
     }
 }
 
