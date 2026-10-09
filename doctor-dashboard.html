@@ -120,7 +120,7 @@ tr:hover { background-color: #f8fafc; }
 .status-none { background: #f1f5f9; color: #64748b; }
 
 .action-btn {
-    padding: 8px 16px;
+    padding: 8px 14px;
     border-radius: 8px;
     border: none;
     background: #1976d2;
@@ -132,6 +132,20 @@ tr:hover { background-color: #f8fafc; }
 
 .action-btn:hover { background: #1565c0; }
 
+.edit-btn {
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 6px;
+    font-weight: 600;
+}
+
+.edit-btn:hover { background: #e2e8f0; }
+
 .discharge-btn {
     background: #f1f5f9;
     color: #64748b;
@@ -140,7 +154,7 @@ tr:hover { background-color: #f8fafc; }
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
-    margin-left: 8px;
+    margin-left: 6px;
 }
 
 .discharge-btn:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
@@ -158,7 +172,7 @@ tr:hover { background-color: #f8fafc; }
 
 .modal-card {
     background: white;
-    width: 440px;
+    width: 460px;
     border-radius: 14px;
     padding: 28px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -188,6 +202,7 @@ tr:hover { background-color: #f8fafc; }
 <header>
     <h1>DrugAssist – Osztályos Betegek</h1>
     <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600; margin-right:10px;">← Vissza a kezdőlapra</a></div>
         <span id="userName" style="font-weight:600;">Dr. Kovács Anna</span>
         
         <!-- OSZTÁLY VÁLASZTÓ -->
@@ -209,7 +224,7 @@ tr:hover { background-color: #f8fafc; }
             <h2 id="deptTitle">Belgyógyászati Osztály</h2>
             <div style="color:#64748b; font-size:14px; margin-top:4px;">Aktív ápolt betegek listája</div>
         </div>
-        <button class="add-patient-btn" onclick="openAddPatientModal()">➕ Új beteg rögzítése</button>
+        <button class="add-patient-btn" onclick="openPatientModal()">➕ Új beteg rögzítése</button>
     </div>
 
     <!-- BETEG TÁBLÁZAT -->
@@ -220,6 +235,7 @@ tr:hover { background-color: #f8fafc; }
                     <th style="width: 90px;">Ágyszám</th>
                     <th>Beteg Neve</th>
                     <th>TAJ Szám</th>
+                    <th>Születési Dátum (Kor)</th>
                     <th>Mai Gyógyszerelés</th>
                     <th style="text-align: right;">Műveletek</th>
                 </tr>
@@ -232,35 +248,42 @@ tr:hover { background-color: #f8fafc; }
 
 </div>
 
-<!-- ÚJ BETEG MODAL -->
-<div id="addPatientModal" class="modal-overlay">
+<!-- BETEG RÖGZÍTŐ / SZERKESZTŐ MODAL -->
+<div id="patientModal" class="modal-overlay">
     <div class="modal-card">
-        <h3>➕ Új beteg rögzítése az osztályra</h3>
+        <h3 id="modalTitle">➕ Beteg adatai</h3>
+        <input type="hidden" id="patientId">
         
         <div class="form-group">
             <label>Beteg Neve *</label>
-            <input type="text" id="newPatientName" placeholder="pl. Kovács János">
+            <input type="text" id="patientNameInput" placeholder="pl. Kovács János">
         </div>
 
         <div class="form-group">
             <label>TAJ Szám *</label>
-            <input type="text" id="newPatientTaj" placeholder="123 456 789">
+            <input type="text" id="patientTajInput" placeholder="123 456 789">
+        </div>
+
+        <div class="form-group">
+            <label>Születési Dátum *</label>
+            <input type="date" id="patientBirthDateInput">
         </div>
 
         <div class="form-group">
             <label>Kórterem / Ágyszám *</label>
-            <input type="text" id="newPatientBed" placeholder="pl. 12/B">
+            <input type="text" id="patientBedInput" placeholder="pl. 12/B">
         </div>
 
         <div class="modal-actions">
-            <button class="cancel-btn" onclick="closeAddPatientModal()">Mégse</button>
-            <button class="save-btn" onclick="saveNewPatient()">Beteg Mentése</button>
+            <button class="cancel-btn" onclick="closePatientModal()">Mégse</button>
+            <button class="save-btn" onclick="savePatient()">Beteg Mentése</button>
         </div>
     </div>
 </div>
 
 <script>
 let currentDept = 'Belgyógyászat';
+let loadedPatients = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     const user = Auth.requireAuth();
@@ -281,10 +304,25 @@ function changeDepartment(newDept) {
     loadDepartmentPatients();
 }
 
+// Életkor kiszámítása születési dátumból
+function calculateAge(birthDateStr) {
+    if (!birthDateStr) return null;
+    const birthDate = new Date(birthDateStr);
+    if (isNaN(birthDate)) return null;
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+}
+
 // 1. Osztályos betegek betöltése Supabase-ből
 async function loadDepartmentPatients() {
     const tbody = document.getElementById("patientTableBody");
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Betegek betöltése...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">Betegek betöltése...</td></tr>';
 
     try {
         const { data: patients, error } = await window.supabaseClient
@@ -295,20 +333,32 @@ async function loadDepartmentPatients() {
             .order('room_bed', { ascending: true });
 
         if (error || !patients || patients.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b; padding:30px;">Nincs aktív beteg ezen az osztályon. Használja az "Új beteg rögzítése" gombot!</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b; padding:30px;">Nincs aktív beteg ezen az osztályon. Használja az "Új beteg rögzítése" gombot!</td></tr>';
             return;
         }
 
+        loadedPatients = patients;
+
         let html = '';
-        patients.forEach(p => {
+        patients.forEach((p, idx) => {
+            const birthDateFormatted = p.birth_date ? new Date(p.birth_date).toLocaleDateString('hu-HU') : '-';
+            const age = calculateAge(p.birth_date);
+            const ageStr = age !== null ? ` (${age} év)` : '';
+
             html += `
                 <tr>
-                    <td><span class="bed-badge">${p.room_bed}</span></td>
-                    <td><strong style="font-size:15px; color:#1e293b;">${p.name}</strong></td>
-                    <td style="color:#64748b;">${p.taj}</td>
+                    <td><span class="bed-badge">${p.room_bed || '-'}</span></td>
+                    <td>
+                        <strong style="font-size:15px; color:#1e293b; cursor:pointer;" onclick="openPatientModal(${idx})">
+                            ${p.name}
+                        </strong>
+                    </td>
+                    <td style="color:#64748b; font-family:monospace;">${p.taj || '-'}</td>
+                    <td style="color:#475569;">${birthDateFormatted}${ageStr}</td>
                     <td><span class="status-badge status-none">Nincs feladva</span></td>
                     <td style="text-align: right;">
                         <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Gyógyszerelés</button>
+                        <button class="edit-btn" onclick="openPatientModal(${idx})">✏️ Szerkesztés</button>
                         <button class="discharge-btn" onclick="dischargePatient('${p.id}', '${p.name}')">Hazament</button>
                     </td>
                 </tr>
@@ -322,42 +372,79 @@ async function loadDepartmentPatients() {
     }
 }
 
-// 2. Új beteg hozzáadása modal
-function openAddPatientModal() {
-    document.getElementById("addPatientModal").style.display = "flex";
+// 2. Modal megnyitása (Új vagy Szerkesztés)
+function openPatientModal(index = null) {
+    if (index !== null && loadedPatients[index]) {
+        // SZERKESZTÉS MÓD
+        const p = loadedPatients[index];
+        document.getElementById("modalTitle").innerText = "✏️ Beteg adatainak szerkesztése";
+        document.getElementById("patientId").value = p.id;
+        document.getElementById("patientNameInput").value = p.name || '';
+        document.getElementById("patientTajInput").value = p.taj || '';
+        document.getElementById("patientBirthDateInput").value = p.birth_date || '';
+        document.getElementById("patientBedInput").value = p.room_bed || '';
+    } else {
+        // ÚJ BETEG MÓD
+        document.getElementById("modalTitle").innerText = "➕ Új beteg rögzítése az osztályra";
+        document.getElementById("patientId").value = '';
+        document.getElementById("patientNameInput").value = '';
+        document.getElementById("patientTajInput").value = '';
+        document.getElementById("patientBirthDateInput").value = '';
+        document.getElementById("patientBedInput").value = '';
+    }
+
+    document.getElementById("patientModal").style.display = "flex";
 }
 
-function closeAddPatientModal() {
-    document.getElementById("addPatientModal").style.display = "none";
-    document.getElementById("newPatientName").value = '';
-    document.getElementById("newPatientTaj").value = '';
-    document.getElementById("newPatientBed").value = '';
+function closePatientModal() {
+    document.getElementById("patientModal").style.display = "none";
 }
 
-async function saveNewPatient() {
-    const name = document.getElementById("newPatientName").value.trim();
-    const taj = document.getElementById("newPatientTaj").value.trim();
-    const bed = document.getElementById("newPatientBed").value.trim();
+// 3. Mentés (Új beszúrás vagy meglévő frissítése)
+async function savePatient() {
+    const patientId = document.getElementById("patientId").value;
+    const name = document.getElementById("patientNameInput").value.trim();
+    const taj = document.getElementById("patientTajInput").value.trim();
+    const birthDate = document.getElementById("patientBirthDateInput").value;
+    const bed = document.getElementById("patientBedInput").value.trim();
 
     if (!name || !taj || !bed) {
-        alert("Kérjük, minden mezőt töltsön ki!");
+        alert("Kérjük, töltse ki a Név, TAJ szám és Ágyszám mezőket!");
         return;
     }
 
     try {
-        const { error } = await window.supabaseClient
-            .from('patients')
-            .insert({
-                name: name,
-                taj: taj,
-                room_bed: bed,
-                department: currentDept,
-                status: 'active'
-            });
+        if (patientId) {
+            // MEGLÉVŐ BETEG FRISSÍTÉSE
+            const { error } = await window.supabaseClient
+                .from('patients')
+                .update({
+                    name: name,
+                    taj: taj,
+                    birth_date: birthDate || null,
+                    room_bed: bed,
+                    department: currentDept
+                })
+                .eq('id', patientId);
 
-        if (error) throw error;
+            if (error) throw error;
+        } else {
+            // ÚJ BETEG HOZZÁADÁSA
+            const { error } = await window.supabaseClient
+                .from('patients')
+                .insert({
+                    name: name,
+                    taj: taj,
+                    birth_date: birthDate || null,
+                    room_bed: bed,
+                    department: currentDept,
+                    status: 'active'
+                });
 
-        closeAddPatientModal();
+            if (error) throw error;
+        }
+
+        closePatientModal();
         loadDepartmentPatients();
 
     } catch (err) {
@@ -366,7 +453,7 @@ async function saveNewPatient() {
     }
 }
 
-// 3. Beteg elbocsátása / Hazament (Soft-delete)
+// 4. Beteg elbocsátása / Hazament (Soft-delete)
 async function dischargePatient(patientId, name) {
     if (!confirm(`Biztosan elbocsátja ${name} nevű beteget? A beteg lekerül az aktív osztályos listáról.`)) {
         return;
