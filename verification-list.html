@@ -5,11 +5,14 @@
 <title>DrugAssist – Ellenőrzésre vár</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Supabase SDK & Config -->
+<!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
@@ -25,9 +28,15 @@ header {
     align-items: center;
 }
 
-h1 { margin: 0; font-size: 20px; }
+h1 { margin: 0; font-size: 20px; color: #1565c0; }
 
-.container { padding: 30px; }
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.container { padding: 30px; max-width: 1200px; margin: auto; }
 
 .section { margin-bottom: 40px; }
 
@@ -35,6 +44,7 @@ h1 { margin: 0; font-size: 20px; }
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 15px;
+    color: #1e293b;
 }
 
 table {
@@ -54,27 +64,43 @@ th, td {
 th {
     background-color: #f0f2f5;
     text-align: left;
+    color: #475569;
+    font-weight: 600;
 }
 
 tr:not(:last-child) { border-bottom: 1px solid #eee; }
 tr:hover { background-color: #fafafa; }
 
 .action-btn {
-    padding: 6px 12px;
-    border-radius: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
     border: none;
     background-color: #2196f3;
     color: white;
     cursor: pointer;
     font-size: 13px;
+    font-weight: 600;
+    transition: 0.2s;
 }
+
+.action-btn:hover { background-color: #1976d2; }
 
 .badge {
     background-color: #4caf50;
     color: white;
     font-size: 12px;
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 12px;
+    font-weight: 600;
+}
+
+.empty-msg {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    color: #64748b;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
 }
 </style>
 </head>
@@ -83,41 +109,135 @@ tr:hover { background-color: #fafafa; }
 
 <header>
     <h1>DrugAssist – Ellenőrzésre vár</h1>
-    <div id="dateTime"></div>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
+        <div id="dateTime" style="color:#64748b; font-size:14px;"></div>
+    </div>
 </header>
 
-<div class="container">
-
-    <div class="section">
-        <div class="section-title">
-            Belgyógyászat <span class="badge">3 beteg</span>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Beteg neve</th>
-                    <th>Ágy</th>
-                    <th>Kiadagolva</th>
-                    <th>Tételek</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Kovács János</td>
-                    <td>12/B</td>
-                    <td>10:05</td>
-                    <td>8</td>
-                    <td><button class="action-btn" onclick="location.href='review.html'">Vizuális Ellenőrzés</button></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
+<div id="contentContainer" class="container">
+    <div class="empty-msg">Adatok betöltése...</div>
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+    Auth.requireAuth();
+    loadVerificationList();
+});
+
+async function loadVerificationList() {
+    const container = document.getElementById("contentContainer");
+
+    try {
+        // 1. LÉPÉS: 'dispensed' státuszú (kiadagolt / tálcázott) igénylések lekérése tételekkel együtt
+        const { data: prescriptions, error: prescError } = await window.supabaseClient
+            .from('prescriptions')
+            .select('id, created_at, updated_at, patient_id, prescription_items(id)')
+            .eq('status', 'dispensed')
+            .order('updated_at', { ascending: false });
+
+        if (prescError) {
+            console.error("Prescriptions lekérdezési hiba:", prescError);
+            throw prescError;
+        }
+
+        if (!prescriptions || prescriptions.length === 0) {
+            container.innerHTML = '<div class="empty-msg">Jelenleg nincs vizuális ellenőrzésre váró tálcázott igénylés.</div>';
+            return;
+        }
+
+        // 2. LÉPÉS: Beteg adatok lekérése a kapott patient_id-k alapján
+        const patientIds = [...new Set(prescriptions.map(p => p.patient_id).filter(Boolean))];
+        
+        let patientsMap = {};
+        if (patientIds.length > 0) {
+            const { data: patients, error: patientError } = await window.supabaseClient
+                .from('patients')
+                .select('id, name, room_bed, department')
+                .in('id', patientIds);
+
+            if (!patientError && patients) {
+                patients.forEach(pat => {
+                    patientsMap[pat.id] = pat;
+                });
+            }
+        }
+
+        // 3. LÉPÉS: Csoportosítás osztályok szerint
+        const groupedByDept = {};
+        prescriptions.forEach(p => {
+            const patient = patientsMap[p.patient_id];
+            const dept = (patient && patient.department) ? patient.department : 'Központi Osztály';
+            
+            if (!groupedByDept[dept]) {
+                groupedByDept[dept] = [];
+            }
+
+            const itemCount = p.prescription_items ? p.prescription_items.length : 0;
+
+            groupedByDept[dept].push({
+                ...p,
+                patientName: patient ? patient.name : 'Ismeretlen beteg',
+                bed: patient ? patient.room_bed : '-',
+                itemCount: itemCount
+            });
+        });
+
+        // 4. LÉPÉS: HTML generálása
+        let html = '';
+        for (const [dept, list] of Object.entries(groupedByDept)) {
+            html += `
+                <div class="section">
+                    <div class="section-title">
+                        ${dept} <span class="badge">${list.length} beteg</span>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Beteg neve</th>
+                                <th>Ágy</th>
+                                <th>Kiadagolva</th>
+                                <th>Tételek</th>
+                                <th style="text-align: right;">Művelet</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            list.forEach(item => {
+                // A kiadagolás időpontja a frissítés (updated_at) vagy létrehozási idő
+                const timeSource = item.updated_at || item.created_at;
+                const timeStr = timeSource ? new Date(timeSource).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+                html += `
+                    <tr>
+                        <td><strong style="color:#1e293b;">${item.patientName}</strong></td>
+                        <td>${item.bed}</td>
+                        <td>${timeStr}</td>
+                        <td><strong style="color:#0f172a;">${item.itemCount} db</strong></td>
+                        <td style="text-align: right;">
+                            <button class="action-btn" onclick="location.href='review.html?patientId=${item.patient_id}&prescriptionId=${item.id}'">Vizuális Ellenőrzés</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+
+    } catch (err) {
+        console.error("Részletes hiba a lista betöltésekor:", err);
+        container.innerHTML = `<div class="empty-msg">Hiba történt az adatok betöltése során (${err.message || 'Adatbázis hiba'}).</div>`;
+    }
+}
+
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
