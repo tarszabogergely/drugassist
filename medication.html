@@ -539,11 +539,11 @@ async function openBatchModal(drug) {
     listContainer.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b;">Meglévő sarzsok keresése...</div>';
 
     try {
-        // Lekérés az inventory_batches táblából az adott gyógyszer nevére
+        // Lekérés az inventory_batches táblából az adott gyógyszer nevére (kis/nagybetű függetlenül)
         const { data: batches, error } = await window.supabaseClient
             .from('inventory_batches')
             .select('*')
-            .ilike('drug_name', drug.brand_name.trim()) // ilike = kis/nagybetű független keresés
+            .ilike('drug_name', drug.brand_name.trim())
             .order('expiry_date', { ascending: true });
 
         if (error) {
@@ -573,6 +573,79 @@ async function openBatchModal(drug) {
     }
 
     document.getElementById("batchModal").style.display = "flex";
+}
+
+async function saveBatchAndConfirm() {
+    const lot = document.getElementById("inputLotNumber").value.trim();
+    const exp = document.getElementById("inputExpiryDate").value;
+
+    if (!lot || !exp) {
+        alert("Kérjük, adja meg a Gyári számot (LOT) és a Lejárati dátumot (EXP)!");
+        return;
+    }
+
+    const currentItem = prescriptionItems[currentScanningItemIndex];
+    const drugName = currentScanningDrug ? currentScanningDrug.brand_name.trim() : '';
+
+    try {
+        // 1. Ellenőrizzük, létezik-e már ez a sarzs az inventory_batches törzsben
+        const { data: existingBatch, error: selectErr } = await window.supabaseClient
+            .from('inventory_batches')
+            .select('id')
+            .ilike('drug_name', drugName)
+            .eq('lot_number', lot)
+            .maybeSingle();
+
+        if (selectErr) {
+            console.warn("Lekérdezési figyelmeztetés:", selectErr);
+        }
+
+        if (!existingBatch) {
+            // Beszúrás az inventory_batches táblába
+            const { error: insertErr } = await window.supabaseClient
+                .from('inventory_batches')
+                .insert({
+                    drug_name: drugName,
+                    ttt_code: currentScanningDrug ? currentScanningDrug.ttt_code || null : null,
+                    lot_number: lot,
+                    expiry_date: exp
+                });
+
+            if (insertErr) {
+                console.error("inventory_batches beszúrási hiba:", insertErr);
+                alert(`Figyelem: Az törzs-sarzs elmentése nem sikerült: ${insertErr.message}`);
+            } else {
+                console.log("Új sarzs sikeresen rögzítve az inventory_batches törzsben!");
+            }
+        }
+
+        // 2. Mentés a konkrét beteg igényléséhez (prescription_items tábla)
+        if (currentItem && currentItem.id) {
+            const { error: itemErr } = await window.supabaseClient
+                .from('prescription_items')
+                .update({
+                    batch_number: lot,
+                    expiration_date: exp
+                })
+                .eq('id', currentItem.id);
+
+            if (itemErr) {
+                console.error("prescription_items sarzs mentési hiba:", itemErr);
+                alert(`Figyelem: A tételsorhoz nem sikerült elmenteni a sarzsot: ${itemErr.message}`);
+            }
+        }
+
+    } catch (e) {
+        console.error("Hiba a sarzs mentése során:", e);
+    }
+
+    // Tétel frissítése az oldalon a memóriában is
+    itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
+    scannedIndices.add(currentScanningItemIndex);
+    lastScannedIndex = currentScanningItemIndex;
+
+    closeBatchModal();
+    renderMedicationTable();
 }
 
 function selectExistingBatch(lot, exp) {
