@@ -114,12 +114,12 @@ async function loadMedicationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. LÉPÉS: 'reviewed' (jóváhagyott) igénylések lekérése JOIN nélkül
+        // 1. LÉPÉS: 'reviewed' (jóváhagyott) igénylések lekérése (updated_at helyett created_at!)
         const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, updated_at, created_at, patient_id')
+            .select('id, created_at, patient_id')
             .eq('status', 'reviewed')
-            .order('updated_at', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (prescError) {
             console.error("Prescriptions lekérdezési hiba:", prescError);
@@ -186,8 +186,7 @@ async function loadMedicationList() {
             `;
 
             list.forEach(item => {
-                const timeSource = item.updated_at || item.created_at;
-                const timeStr = timeSource ? new Date(timeSource).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const timeStr = item.created_at ? new Date(item.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
 
                 html += `
                     <tr>
