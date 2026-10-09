@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Beteg adatlap</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+/* ===== HEADER ===== */
+
+header {
+    background: white;
+    padding: 14px 30px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 {
+    margin: 0;
+    font-size: 18px;
+    color: #1565c0;
+}
+
+.header-right {
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* ===== CONTAINER ===== */
+
+.container {
+    padding: 30px;
+    max-width: 1100px;
+    margin: auto;
+}
+
+.back-link {
+    margin-bottom: 20px;
+}
+
+.back-link a {
+    text-decoration: none;
+    color: #1976d2;
+    font-weight: 600;
+}
+
+/* ===== PATIENT CARD ===== */
+
+.patient-card {
+    background: white;
+    padding: 22px;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+}
+
+.patient-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 10px;
+}
+
+.patient-info {
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.8;
+}
+
+/* ===== TABLE ===== */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+th, td {
+    padding: 14px 16px;
+    font-size: 14px;
+}
+
+th {
+    background-color: #f0f2f5;
+    text-align: left;
+    color: #475569;
+    font-weight: 600;
+}
+
+tr:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
+
+tr:hover {
+    background-color: #fafafa;
+}
+
+/* ===== STATUS ===== */
+
+.status-ok { color: #2e7d32; font-weight: 600; }
+.status-warning { color: #e65100; font-weight: 600; }
+.status-progress { color: #1565c0; font-weight: 600; }
+.status-gray { color: #64748b; font-weight: 600; }
+
+/* ===== BUTTONS ===== */
+
+.pdf-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background-color: #1976d2;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.pdf-btn:hover { background-color: #1565c0; }
+
+.label-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background-color: #4caf50;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.label-btn:hover { background-color: #43a047; }
+
+.empty-msg {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Beteg adatlap</h1>
+    <div class="header-right">
+        <div><a href="patients-list.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a betegekhez</a></div>
+        <div><span id="userName">Kovács Anna</span> | <span id="dateTime"></span></div>
+    </div>
+</header>
+
+<div class="container">
+
+<!-- BETEG ADATOK -->
+
+<div class="patient-card">
+    <div class="patient-name" id="patientName">Beteg betöltése...</div>
+    <div class="patient-info">
+        TAJ: <span id="patientTaj" style="font-family:monospace; font-weight:bold;">-</span><br>
+        Születési év: <span id="patientBirthYear">-</span><br>
+        Utolsó osztály: <span id="patientDept">-</span><br>
+        Jelenlegi státusz: <span id="patientCurrentStatus" class="status-gray">Nincs adatsor</span>
+    </div>
+</div>
+
+<!-- ELŐZMÉNYEK -->
+
+<h2 style="font-size:18px; margin-bottom:15px; color:#1e293b;">Korábbi gyógyszerelések</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Dátum</th>
+            <th>Osztály</th>
+            <th>Gyógyszerelés ID</th>
+            <th>Státusz</th>
+            <th style="text-align: center;"></th>
+            <th style="text-align: center;"></th>
+        </tr>
+    </thead>
+    <tbody id="historyTableBody">
+        <tr>
+            <td colspan="6" class="empty-msg">Előzmények betöltése...</td>
+        </tr>
+    </tbody>
+</table>
+
+</div>
+
+<script>
+let currentPatientId = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    currentPatientId = urlParams.get('patientId');
+
+    if (currentPatientId) {
+        loadPatientDetail(currentPatientId);
+    } else {
+        document.getElementById("patientName").innerText = "Hiba: Hiányzó beteg azonosító!";
+    }
+});
+
+function updateDateTime() {
+    const now = new Date();
+    const date = now.toLocaleDateString("hu-HU");
+    const time = now.toLocaleTimeString("hu-HU", {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    document.getElementById("dateTime").innerText = date + " | " + time;
+}
+
+updateDateTime();
+setInterval(updateDateTime, 10000);
+
+/* SUPABASE ADATOK BETÖLTÉSE */
+
+async function loadPatientDetail(patientId) {
+    try {
+        // 1. Beteg alapadatainak lekérése
+        const { data: patient, error: pErr } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .eq('id', patientId)
+            .single();
+
+        if (pErr) throw pErr;
+
+        if (patient) {
+            document.getElementById("patientName").innerText = patient.name;
+            document.getElementById("patientTaj").innerText = patient.taj || '-';
+            
+            const birthYear = patient.birth_date ? new Date(patient.birth_date).getFullYear() : '-';
+            document.getElementById("patientBirthYear").innerText = birthYear;
+            document.getElementById("patientDept").innerText = patient.department || '-';
+        }
+
+        // 2. Igénylési előzmények lekérése
+        const { data: prescriptions, error: prErr } = await window.supabaseClient
+            .from('prescriptions')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false });
+
+        if (prErr) throw prErr;
+
+        const tbody = document.getElementById("historyTableBody");
+
+        if (!prescriptions || prescriptions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Nincsenek korábbi gyógyszerelési előzmények erről a betegről.</td></tr>';
+            document.getElementById("patientCurrentStatus").className = "status-gray";
+            document.getElementById("patientCurrentStatus").innerText = "Nincs aktív igénylés";
+            return;
+        }
+
+        // Jelenlegi (legfrissebb) státusz kijelzése a kártyán
+        const latest = prescriptions[0];
+        updateCurrentStatusBadge(latest.status);
+
+        // Táblázat feltöltése
+        let html = '';
+        prescriptions.forEach(p => {
+            const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('hu-HU') : '-';
+            const barcodeStr = p.barcode || `MED-${dateStr.replace(/\./g, '')}-${p.id.substring(0, 5).toUpperCase()}`;
+            const statusObj = getStatusDisplay(p.status);
+
+            html += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${patient ? patient.department || '-' : '-'}</td>
+                    <td style="font-family:monospace; font-weight:600; color:#334155;">${barcodeStr}</td>
+                    <td class="${statusObj.className}">${statusObj.label}</td>
+                    <td style="text-align: center;">
+                        <button class="pdf-btn" onclick="location.href='pdfpatient-detail.html?prescriptionId=${p.id}'">PDF megnyitás</button>
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="label-btn" onclick="location.href='pdflabel.html?prescriptionId=${p.id}'">Címke nyomtatás</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+
+    } catch (err) {
+        console.error("Hiba a beteg adatlap betöltésekor:", err);
+        document.getElementById("patientName").innerText = "Hiba történt az adatok betöltése során.";
+    }
+}
+
+function getStatusDisplay(status) {
+    switch (status) {
+        case 'submitted':
+            return { label: 'Jóváhagyásra vár', className: 'status-warning' };
+        case 'reviewed':
+            return { label: 'Gyógyszerelésre vár', className: 'status-progress' };
+        case 'dispensed':
+            return { label: 'Ellenőrzésre vár', className: 'status-progress' };
+        case 'completed':
+            return { label: 'Készen van', className: 'status-ok' };
+        default:
+            return { label: 'Ismeretlen', className: 'status-gray' };
+    }
+}
+
+function updateCurrentStatusBadge(status) {
+    const badge = document.getElementById("patientCurrentStatus");
+    const statusObj = getStatusDisplay(status);
+    badge.className = statusObj.className;
+    badge.innerText = statusObj.label;
+}
+</script>
+
+</body>
+</html>
