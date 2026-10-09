@@ -129,12 +129,12 @@ async function loadVerificationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. LÉPÉS: 'dispensed' státuszú (kiadagolt / tálcázott) igénylések lekérése tételekkel együtt
+        // 1. LÉPÉS: 'dispensed' státuszú igénylések lekérése (csak a meglévő created_at oszlopot használjuk)
         const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, created_at, updated_at, patient_id, prescription_items(id)')
+            .select('id, created_at, patient_id, prescription_items(id)')
             .eq('status', 'dispensed')
-            .order('updated_at', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (prescError) {
             console.error("Prescriptions lekérdezési hiba:", prescError);
@@ -206,9 +206,7 @@ async function loadVerificationList() {
             `;
 
             list.forEach(item => {
-                // A kiadagolás időpontja a frissítés (updated_at) vagy létrehozási idő
-                const timeSource = item.updated_at || item.created_at;
-                const timeStr = timeSource ? new Date(timeSource).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const timeStr = item.created_at ? new Date(item.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
 
                 html += `
                     <tr>
