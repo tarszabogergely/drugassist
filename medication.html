@@ -594,23 +594,36 @@ async function saveBatchAndConfirm() {
     }
 
     const currentItem = prescriptionItems[currentScanningItemIndex];
+    const drugName = currentScanningDrug ? currentScanningDrug.brand_name.trim() : '';
 
     try {
-        // 1. Mentés az inventory_batches táblába (hogy legközelebb felajánlja)
-        const { error: batchErr } = await window.supabaseClient
+        // 1. Megnézzük, létezik-e már ez a sarzs az inventory_batches táblában
+        const { data: existingBatch } = await window.supabaseClient
             .from('inventory_batches')
-            .upsert({
-                drug_name: currentScanningDrug.brand_name,
-                ttt_code: currentScanningDrug.ttt_code || null,
-                lot_number: lot,
-                expiry_date: exp
-            }, { onConflict: 'drug_name,lot_number' });
+            .select('id')
+            .eq('drug_name', drugName)
+            .eq('lot_number', lot)
+            .maybeSingle();
 
-        if (batchErr) {
-            console.error("inventory_batches hiba:", batchErr);
+        if (!existingBatch) {
+            // Ha még nincs ilyen sarzs, beszúrjuk az inventory_batches táblába
+            const { error: insertErr } = await window.supabaseClient
+                .from('inventory_batches')
+                .insert({
+                    drug_name: drugName,
+                    ttt_code: currentScanningDrug.ttt_code || null,
+                    lot_number: lot,
+                    expiry_date: exp
+                });
+
+            if (insertErr) {
+                console.error("inventory_batches beszúrási hiba:", insertErr);
+            } else {
+                console.log("Új sarzs sikeresen rögzítve az inventory_batches törzsbe!");
+            }
         }
 
-        // 2. Mentés a prescription_items táblába (a konkrét igénylési tételhez)
+        // 2. Mentés a konkrét beteg igényléséhez (prescription_items tábla)
         if (currentItem && currentItem.id) {
             const { error: itemErr } = await window.supabaseClient
                 .from('prescription_items')
@@ -622,7 +635,7 @@ async function saveBatchAndConfirm() {
 
             if (itemErr) {
                 console.error("prescription_items sarzs mentési hiba:", itemErr);
-                alert(`Figyelem: A sarzs elmentése a tételsorhoz nem sikerült: ${itemErr.message}`);
+                alert(`Figyelem: A tételsorhoz nem sikerült elmenteni a sarzsot: ${itemErr.message}`);
             }
         }
 
@@ -630,7 +643,7 @@ async function saveBatchAndConfirm() {
         console.error("Hiba a sarzs mentése során:", e);
     }
 
-    // Tétel frissítése az oldalon memóriában is
+    // Tétel frissítése az oldalon a memóriában is
     itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
     scannedIndices.add(currentScanningItemIndex);
     lastScannedIndex = currentScanningItemIndex;
