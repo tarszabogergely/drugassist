@@ -502,7 +502,7 @@ function renderPatientTable(patients) {
     ${viewStatus === 'active' ? `
         <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
             <div style="display: flex; gap: 4px;">
-                <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Mai gyógyszerelés</button>
+                <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Napi gyógyszerelés</button>
                 <button class="weekend-btn" onclick="location.href='multi-day-prescription.html?patientId=${p.id}'">📅 Többnapos gyógyszerelés</button>
             </div>
             <div style="display: flex; gap: 4px;">
