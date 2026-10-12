@@ -29,16 +29,20 @@ header {
 }
 
 header h1 { margin: 0; font-size: 22px; color: #1565c0; }
-.user-info { color: #666; font-size: 14px; }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info { color: #666; font-size: 14px; font-weight: 600; }
 
 .container {
     max-width: 1200px;
     margin: auto;
     padding: 32px;
 }
-
-.back { margin-bottom: 24px; }
-.back a { text-decoration: none; color: #1976d2; font-weight: 600; }
 
 .card {
     background: white;
@@ -285,16 +289,15 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
 
 <header>
     <h1>DrugAssist – Patikai Igénylés Jóváhagyása</h1>
-    <div class="user-info">
-        <span id="userName">Gyógyszerész</span> | <span id="dateTime"></span>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
+        <div class="user-info">
+            <span id="userName">Gyógyszerész</span> | <span id="dateTime"></span>
+        </div>
     </div>
 </header>
 
 <div class="container">
-
-<div class="back">
-    <a href="approval-list.html">← Vissza a jóváhagyásra váró listához</a>
-</div>
 
 <!-- BETEG ADATOK -->
 <section class="card">
@@ -408,7 +411,18 @@ let activeTab = 'atc';
 let isWarningsApproved = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    Auth.requireAuth();
+    // 3. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓ KIJELZÉSE
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name || user.email;
+    }
+
+    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE -> approval-list.html
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        window.location.href = 'approval-list.html';
+    };
+
     await loadLocalInventory();
     await loadInteractionsMaster();
 
@@ -510,7 +524,6 @@ async function checkWarnings(items) {
     const warningsList = document.getElementById("warningsList");
     let warnings = [];
 
-    // Hatóanyagok kigyűjtése
     const activeIngredients = items.map(i => {
         const ingredient = i.substituted_ingredient || (i.pupha_master ? i.pupha_master.active_ingredient : '');
         return {
@@ -519,14 +532,12 @@ async function checkWarnings(items) {
         };
     }).filter(x => x.ingredient);
 
-    // A) HATÓANYAG DUPLIKÁCIÓ SZŰRÉS
     const ingList = activeIngredients.map(a => a.ingredient);
     const duplicates = ingList.filter((item, index) => ingList.indexOf(item) !== index);
     if (duplicates.length > 0) {
         warnings.push(`⚠️ <strong>Duplikált hatóanyag a terápiában:</strong> ${[...new Set(duplicates)].join(', ')}`);
     }
 
-    // B) SUPABASE KÖLCSÖNHATÁS (INTERACTIONS) LEKÉRDEZÉS
     for (let i = 0; i < activeIngredients.length; i++) {
         for (let j = i + 1; j < activeIngredients.length; j++) {
             const ingA = activeIngredients[i].ingredient;
@@ -548,7 +559,6 @@ async function checkWarnings(items) {
         }
     }
 
-    // FIGYELMEZTETÉS KIJELZÉSE (KÉSZLETHIÁNY RIASZTÁS KIKAPCSOLVA)
     if (warnings.length > 0) {
         alertBox.className = "alert-box alert-warning";
         alertBox.innerHTML = `<span>⚠️ ${warnings.length} figyelmeztetés (Kattintson)</span>`;
@@ -604,7 +614,6 @@ function renderMedicationTable() {
         const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
         const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
 
-        // IS_PATIENT_BROUGHT ÉS IS_OWN_MEDICATION BEAZONOSÍTÁSA
         const isOwn = !!(item.is_patient_brought || item.is_own_medication);
 
         const isInStock = isOwn || localInventory.some(l => 
@@ -644,7 +653,7 @@ function renderMedicationTable() {
 
 function openSubstituteModal(index) {
     const item = prescriptionItems[index];
-    if (item.is_patient_brought || item.is_own_medication) return; // SAJÁT GYÓGYSZER NEM HELYETTESÍTHETŐ
+    if (item.is_patient_brought || item.is_own_medication) return;
 
     selectedItemIndex = index;
 
