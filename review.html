@@ -38,6 +38,12 @@ header h1 {
     color: #1565c0;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
 .user-info {
     font-size: 14px;
     color: #546e7a;
@@ -48,20 +54,6 @@ header h1 {
     max-width: 1200px;
     margin: auto;
     padding: 32px;
-}
-
-.back {
-    margin-bottom: 20px;
-}
-
-.back a {
-    color: #1565c0;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.back a:hover {
-    text-decoration: underline;
 }
 
 .card {
@@ -159,19 +151,6 @@ header h1 {
     width: fit-content;
 }
 
-.batch-box {
-    display: inline-flex;
-    gap: 12px;
-    background: #f0fdf4;
-    border: 1px solid #dcfce7;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    color: #166534;
-    font-weight: 700;
-    width: fit-content;
-}
-
 .dose {
     text-align: center;
     font-weight: 700;
@@ -204,7 +183,7 @@ header h1 {
     transition: transform .15s, background .25s, color .25s, border-color .25s;
 }
 
-.check-button:hover {
+.check-button:hover:not(.disabled) {
     transform: scale(1.08);
     border-color: #94a3b8;
 }
@@ -213,6 +192,11 @@ header h1 {
     background: #2e7d32;
     border-color: #2e7d32;
     color: white;
+}
+
+.check-button.disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .reviewed td {
@@ -324,16 +308,15 @@ header h1 {
 
 <header>
     <h1>DrugAssist – Gyógyszerészi ellenőrzés</h1>
-    <div class="user-info">
-        <span id="userInfo">Gyógyszerész</span> | <span id="dateTime"></span>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
+        <div class="user-info">
+            <span id="userInfo">Gyógyszerész</span> | <span id="dateTime"></span>
+        </div>
     </div>
 </header>
 
 <div class="container">
-
-<div class="back">
-    <a href="verification-list.html">← Vissza az ellenőrzésre váró listához</a>
-</div>
 
 <!-- BETEG ADATOK -->
 <section class="card">
@@ -401,6 +384,7 @@ let currentPatientId = null;
 let expectedBarcode = "";
 let itemsCheckState = {}; // Tétel ID -> boolean
 let prescriptionItems = [];
+let isAlreadyCompleted = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const user = Auth.requireAuth();
@@ -466,11 +450,13 @@ async function loadReviewData(patientId, prescriptionId) {
         expectedBarcode = prescription.barcode || '';
         document.getElementById("productionId").innerText = expectedBarcode || 'Nincs generálva';
 
+        // Állapot ellenőrzése: Le van-e már zárva?
+        isAlreadyCompleted = (prescription.status === 'completed');
+
         // 3. Készítő személy (dispensed_by vagy reviewed_by vagy prescribed_by) beazonosítása
         const creatorId = prescription.dispensed_by || prescription.reviewed_by || prescription.prescribed_by;
         
         if (creatorId) {
-            // Profil keresése id vagy user_id alapján
             const { data: profile } = await window.supabaseClient
                 .from('profiles')
                 .select('*')
@@ -479,8 +465,6 @@ async function loadReviewData(patientId, prescriptionId) {
 
             if (profile && (profile.full_name || profile.email)) {
                 document.getElementById("preparedBy").innerText = profile.full_name || profile.email;
-            } else if (creatorId === '11111111-1111-1111-1111-111111111111') {
-                document.getElementById("preparedBy").innerText = "Dr. Tarszabó Gergely (Gyógyszerész)";
             } else {
                 document.getElementById("preparedBy").innerText = "Dr. Tarszabó Gergely";
             }
@@ -489,6 +473,14 @@ async function loadReviewData(patientId, prescriptionId) {
         }
 
         prescriptionItems = prescription.prescription_items || [];
+
+        // Ha már le van zárva, mindent automatikusan checked-re állítunk
+        if (isAlreadyCompleted) {
+            prescriptionItems.forEach(item => {
+                itemsCheckState[item.id] = true;
+            });
+        }
+
         renderReviewTable(prescriptionItems);
 
     } catch (e) {
@@ -499,7 +491,7 @@ async function loadReviewData(patientId, prescriptionId) {
 function renderReviewTable(items) {
     const tbody = document.getElementById("medicationTable");
     if (!items || items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b; padding:20px;">Nincsenek tételek ebben az igénylésben.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">Nincsenek tételek ebben az igénylésben.</td></tr>';
         return;
     }
 
@@ -510,7 +502,6 @@ function renderReviewTable(items) {
 
         const displayBrandName = item.substituted_name || (local ? local.brand_name : (pupha ? pupha.brand_name : 'Ismeretlen gyógyszer'));
         
-        // Eredeti elrendelt gyógyszer felderítése, ha történt helyettesítés
         let originalBrandName = null;
         if (item.substituted_name && pupha && pupha.brand_name && pupha.brand_name !== item.substituted_name) {
             originalBrandName = pupha.brand_name;
@@ -528,7 +519,7 @@ function renderReviewTable(items) {
 
         const isChecked = itemsCheckState[item.id] || false;
         const rowClass = isChecked ? 'reviewed' : '';
-        const checkClass = isChecked ? 'check-button checked' : 'check-button';
+        const checkClass = `check-button ${isChecked ? 'checked' : ''} ${isAlreadyCompleted ? 'disabled' : ''}`;
 
         html += `
             <tr id="row-${item.id}" class="${rowClass}">
@@ -550,7 +541,7 @@ function renderReviewTable(items) {
                 <td class="dose">${item.dose_afternoon || 0}</td>
                 <td class="dose">${item.dose_evening || 0}</td>
                 <td class="check-cell">
-                    <div class="${checkClass}" onclick="toggleCheck('${item.id}')">
+                    <div class="${checkClass}" onclick="${isAlreadyCompleted ? '' : `toggleCheck('${item.id}')`}">
                         ${isChecked ? '✓' : ''}
                     </div>
                 </td>
@@ -563,23 +554,34 @@ function renderReviewTable(items) {
 }
 
 function toggleCheck(itemId) {
+    if (isAlreadyCompleted) return;
     itemsCheckState[itemId] = !itemsCheckState[itemId];
     renderReviewTable(prescriptionItems);
 }
 
 function updateCompleteButtonState() {
+    const completeBtn = document.getElementById("reviewButton");
+    
+    if (isAlreadyCompleted) {
+        completeBtn.innerText = "🔒 A gyógyszerelés ellenőrizve és lezárva";
+        completeBtn.disabled = true;
+        return;
+    }
+
     const totalItems = prescriptionItems.length;
     const checkedCount = Object.values(itemsCheckState).filter(Boolean).length;
     
-    const completeBtn = document.getElementById("reviewButton");
     if (totalItems > 0 && checkedCount === totalItems) {
+        completeBtn.innerText = "✔ Ellenőrzés lezárása";
         completeBtn.disabled = false;
     } else {
+        completeBtn.innerText = "✔ Ellenőrzés lezárása";
         completeBtn.disabled = true;
     }
 }
 
 function openBarcodeModal() {
+    if (isAlreadyCompleted) return;
     document.getElementById("barcodeInput").value = '';
     document.getElementById("barcodeError").innerText = '';
     document.getElementById("barcodeModal").classList.remove("hidden");
@@ -613,7 +615,7 @@ async function confirmReviewWithBarcode() {
             .from('prescriptions')
             .update({
                 status: 'completed',
-                reviewed_by: user ? user.id : null
+                verified_by: user ? user.id : null
             })
             .eq('id', currentPrescriptionId);
 
@@ -623,9 +625,9 @@ async function confirmReviewWithBarcode() {
             return;
         }
 
-        alert("A gyógyszerelés gyógyszerészi ellenőrzése sikeresen lezárva!");
+        // Felugró ablak nélkül, azonnali átirányítás a completed-list.html-re
         closeBarcodeModal();
-        window.location.href = 'verification-list.html';
+        window.location.href = 'completed-list.html';
 
     } catch (e) {
         console.error("Váratlan hiba:", e);
