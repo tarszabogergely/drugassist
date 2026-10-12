@@ -384,7 +384,7 @@ async function loadDepartmentPatients() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">Betegek betöltése...</td></tr>';
 
     try {
-        // 1. Lépés: Betegek lekérése az osztályról
+        // 1. LÉPÉS: Betegek lekérése az osztályról
         const { data: patients, error } = await window.supabaseClient
             .from('patients')
             .select('*')
@@ -393,36 +393,32 @@ async function loadDepartmentPatients() {
             .order('room_bed', { ascending: true });
 
         if (error || !patients || patients.length === 0) {
+            console.warn("Nincs találat a betegekre:", { currentDept, viewStatus, error });
             tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:30px;">
-                Nincs ${viewStatus === 'active' ? 'aktív' : 'elbocsátott'} beteg ezen az osztályon.
+                Nincs ${viewStatus === 'active' ? 'aktív' : 'elbocsátott'} beteg a(z) "${currentDept}" osztályon.
             </td></tr>`;
             return;
         }
 
         loadedPatients = patients;
-
-        // 2. Lépés: Mai nap kezdetének kiszámítása a helyi időzóna alapján
-        const now = new Date();
-        const localTodayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
-        
         const patientIds = patients.map(p => p.id);
 
         todaysPrescriptionsMap = {};
+        
+        // 2. LÉPÉS: Legutolsó igénylések lekérése a betegekhez (dátumszűrő nélkül!)
         if (patientIds.length > 0) {
             const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
                 .select('*')
                 .in('patient_id', patientIds)
-                .gte('created_at', localTodayStart)
                 .order('created_at', { ascending: false });
 
             if (prescErr) {
                 console.error("Prescriptions lekérdezési hiba:", prescErr);
-            }
-
-            if (prescriptions) {
+            } else if (prescriptions) {
+                console.log("Megtalált igénylések:", prescriptions);
                 prescriptions.forEach(p => {
-                    // Legfrissebb igénylés hozzárendelése a beteghez
+                    // Mivel időrendben csökkenő, a legfrissebb kerül be
                     if (!todaysPrescriptionsMap[p.patient_id]) {
                         todaysPrescriptionsMap[p.patient_id] = p;
                     }
@@ -437,7 +433,6 @@ async function loadDepartmentPatients() {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#c62828; padding:30px;">Hiba történt az adatok betöltése során.</td></tr>';
     }
 }
-
 // Táblázat kirajzolása és keresési szűrés
 function renderPatientTable(patients) {
     const tbody = document.getElementById("patientTableBody");
