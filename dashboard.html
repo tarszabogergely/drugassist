@@ -363,10 +363,10 @@ async function loadDashboardData() {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
-        // 1. ÖSSZES IGÉNYLÉS LEKÉRÉSE A FELSŐ STÁTUSZKÁRTYÁKHOZ (DÁTUMS ZŰRŐ NÉLKÜL)
+        // 1. ÖSSZES IGÉNYLÉS LEKÉRDEZÉSE
         const { data: allPrescriptions, error: allPErr } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, status, patient_id, created_at');
+            .select('id, status, patient_id, created_at, updated_at');
 
         if (allPErr) throw allPErr;
 
@@ -379,13 +379,19 @@ async function loadDashboardData() {
 
         if (allPrescriptions) {
             allPrescriptions.forEach(p => {
-                // Felső kártyák számlálása minden meglévő igénylésre
+                // Az aktív, várakozó státuszokat dátumtól függetlenül mind számoljuk
                 if (p.status === 'submitted') cntSubmitted++;
                 else if (p.status === 'reviewed') cntReviewed++;
                 else if (p.status === 'dispensed') cntDispensed++;
-                else if (p.status === 'completed') cntCompleted++;
+                // A "Kész" (completed) számláló KIZÁRÓLAG a mai napon frissült/lezárt tételeket mutatja
+                else if (p.status === 'completed') {
+                    const checkDate = p.updated_at || p.created_at;
+                    if (checkDate && checkDate >= startOfToday) {
+                        cntCompleted++;
+                    }
+                }
 
-                // Osztályos blokkhoz csak a mai napit gyűjtjük ki
+                // Osztályos blokkhoz a mai napon létrehozott igényléseket gyűjtjük
                 if (p.created_at && p.created_at >= startOfToday) {
                     if (!patientTodayPrescMap[p.patient_id]) {
                         patientTodayPrescMap[p.patient_id] = p.status;
