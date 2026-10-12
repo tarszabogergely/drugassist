@@ -259,8 +259,8 @@ header h1 {
 
 <div class="container">
 
-<!-- ===== ÉLŐ STÁTUSZOK (MAI NAP) ===== -->
-<div class="section-title-main">📊 Mai Gyógyszerelési Fázisok</div>
+<!-- ===== ÉLŐ STÁTUSZOK (ÖSSZES TÉTEL) ===== -->
+<div class="section-title-main">📊 Gyógyszerelési Fázisok</div>
 <div class="status-grid">
     <div class="status-card orange" onclick="location.href='approval-list.html'">
         <div class="status-title">Jóváhagyásra vár</div>
@@ -363,6 +363,43 @@ async function loadDashboardData() {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
+        // 1. ÖSSZES IGÉNYLÉS LEKÉRÉSE A FELSŐ STÁTUSZKÁRTYÁKHOZ (DÁTUMS ZŰRŐ NÉLKÜL)
+        const { data: allPrescriptions, error: allPErr } = await window.supabaseClient
+            .from('prescriptions')
+            .select('id, status, patient_id, created_at');
+
+        if (allPErr) throw allPErr;
+
+        let cntSubmitted = 0;
+        let cntReviewed = 0;
+        let cntDispensed = 0;
+        let cntCompleted = 0;
+
+        const patientTodayPrescMap = {};
+
+        if (allPrescriptions) {
+            allPrescriptions.forEach(p => {
+                // Felső kártyák számlálása minden meglévő igénylésre
+                if (p.status === 'submitted') cntSubmitted++;
+                else if (p.status === 'reviewed') cntReviewed++;
+                else if (p.status === 'dispensed') cntDispensed++;
+                else if (p.status === 'completed') cntCompleted++;
+
+                // Osztályos blokkhoz csak a mai napit gyűjtjük ki
+                if (p.created_at && p.created_at >= startOfToday) {
+                    if (!patientTodayPrescMap[p.patient_id]) {
+                        patientTodayPrescMap[p.patient_id] = p.status;
+                    }
+                }
+            });
+        }
+
+        document.getElementById("cntSubmitted").innerText = cntSubmitted;
+        document.getElementById("cntReviewed").innerText = cntReviewed;
+        document.getElementById("cntDispensed").innerText = cntDispensed;
+        document.getElementById("cntCompleted").innerText = cntCompleted;
+
+        // 2. AKTÍV BETEGEK LEKÉRDEZÉSE AZ OSZTÁLYOS KÁRTYÁKHOZ
         const { data: activePatients, error: patErr } = await window.supabaseClient
             .from('patients')
             .select('id, name, department')
@@ -383,38 +420,6 @@ async function loadDashboardData() {
             }
             deptPatientsMap[dept].push(p.id);
         });
-
-        const { data: todayPrescriptions, error: pErr } = await window.supabaseClient
-            .from('prescriptions')
-            .select('id, status, patient_id')
-            .gte('created_at', startOfToday);
-
-        if (pErr) throw pErr;
-
-        let cntSubmitted = 0;
-        let cntReviewed = 0;
-        let cntDispensed = 0;
-        let cntCompleted = 0;
-
-        const patientTodayPrescMap = {};
-
-        if (todayPrescriptions) {
-            todayPrescriptions.forEach(p => {
-                if (p.status === 'submitted') cntSubmitted++;
-                else if (p.status === 'reviewed') cntReviewed++;
-                else if (p.status === 'dispensed') cntDispensed++;
-                else if (p.status === 'completed') cntCompleted++;
-
-                if (!patientTodayPrescMap[p.patient_id]) {
-                    patientTodayPrescMap[p.patient_id] = p.status;
-                }
-            });
-        }
-
-        document.getElementById("cntSubmitted").innerText = cntSubmitted;
-        document.getElementById("cntReviewed").innerText = cntReviewed;
-        document.getElementById("cntDispensed").innerText = cntDispensed;
-        document.getElementById("cntCompleted").innerText = cntCompleted;
 
         const wardContainer = document.getElementById("wardGridContainer");
         let html = '';
