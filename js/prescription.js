@@ -318,18 +318,19 @@ const Prescription = {
                 const { error: updateErr } = await window.supabaseClient
                     .from('prescriptions')
                     .update({
-                        status: 'submitted',
-                        updated_at: new Date()
+                        status: 'submitted'
                     })
                     .eq('id', prescriptionId);
 
                 if (updateErr) throw updateErr;
 
-                // Régi tételek törlése és újak beszúrása
-                await window.supabaseClient
+                // Régi tételek törlése
+                const { error: deleteErr } = await window.supabaseClient
                     .from('prescription_items')
                     .delete()
                     .eq('prescription_id', prescriptionId);
+
+                if (deleteErr) throw deleteErr;
 
             } else {
                 // 2. ÚJ IGÉNYLÉS LÉTREHOZÁSA (INSERT)
