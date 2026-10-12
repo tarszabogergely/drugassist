@@ -21,7 +21,7 @@ body {
 
 header {
     background: white;
-    padding: 14px 32px;
+    padding: 14px 30px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
     justify-content: space-between;
@@ -58,7 +58,7 @@ header h1 {
 .logout-btn:hover { background: #ffcdd2; }
 
 .container {
-    padding: 32px;
+    padding: 30px;
     max-width: 1200px;
     margin: auto;
 }
@@ -70,116 +70,81 @@ header h1 {
     margin-bottom: 20px;
 }
 
-/* BETEG KÁRTYÁK */
-.patients-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 20px;
-}
-
-.patient-card {
+/* TÁBLÁZAT STÍLUSOK (SOROS NÉZET) */
+table {
+    width: 100%;
+    border-collapse: collapse;
     background: white;
-    border-radius: 14px;
-    padding: 22px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-    border: 1px solid #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: 0.2s;
-}
-
-.patient-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.patient-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
-}
-
-.patient-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1e293b;
-}
-
-.bed-badge {
-    background: #e2e8f0;
-    color: #334155;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 10px;
     border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
 }
 
-.patient-info-list {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.6;
-    margin-bottom: 18px;
+th, td {
+    padding: 14px 16px;
+    font-size: 14px;
 }
 
-.status-line {
-    margin-top: 6px;
+th {
+    background-color: #f0f2f5;
+    text-align: left;
+    color: #475569;
     font-weight: 600;
-    font-size: 13px;
 }
 
-.status-submitted { color: #e65100; }
-.status-reviewed { color: #1565c0; }
-.status-completed { color: #2e7d32; }
-.status-none { color: #94a3b8; }
+tr:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
 
-.card-actions {
+tr:hover {
+    background-color: #fafafa;
+}
+
+/* STÁTUSZ SZÍNEK */
+.status-submitted { color: #e65100; font-weight: 600; }
+.status-reviewed { color: #1565c0; font-weight: 600; }
+.status-completed { color: #2e7d32; font-weight: 600; }
+.status-none { color: #94a3b8; font-weight: 500; }
+
+/* GOMBOK */
+.btn-group {
     display: flex;
+    justify-content: flex-end;
     gap: 8px;
-    border-top: 1px solid #f1f5f9;
-    padding-top: 14px;
 }
 
 .btn-primary {
-    flex: 1;
     background: #1976d2;
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 8px 14px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    text-align: center;
     transition: 0.2s;
 }
 
 .btn-primary:hover { background: #1565c0; }
 
 .btn-weekend {
-    flex: 1;
     background: #2e7d32;
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 8px 14px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    text-align: center;
     transition: 0.2s;
 }
 
 .btn-weekend:hover { background: #1b5e20; }
 
 .empty-msg {
-    background: white;
     padding: 30px;
-    border-radius: 14px;
     text-align: center;
     color: #64748b;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
 }
 </style>
 </head>
@@ -199,9 +164,23 @@ header h1 {
 
 <div class="section-title">🏥 Osztályos Betegek & Mai Gyógyszerigénylés</div>
 
-<div id="patientsContainer" class="patients-grid">
-    <div class="empty-msg">Betegek betöltése...</div>
-</div>
+<table>
+    <thead>
+        <tr>
+            <th>Beteg neve</th>
+            <th>TAJ</th>
+            <th>Ágy</th>
+            <th>Osztály</th>
+            <th>Mai állapot</th>
+            <th style="text-align: right;">Műveletek</th>
+        </tr>
+    </thead>
+    <tbody id="patientsTableBody">
+        <tr>
+            <td colspan="6" class="empty-msg">Betegek betöltése...</td>
+        </tr>
+    </tbody>
+</table>
 
 </div>
 
@@ -231,7 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadDoctorPatients() {
-    const container = document.getElementById("patientsContainer");
+    const tbody = document.getElementById("patientsTableBody");
 
     try {
         const now = new Date();
@@ -247,7 +226,7 @@ async function loadDoctorPatients() {
         if (patErr) throw patErr;
 
         if (!patients || patients.length === 0) {
-            container.innerHTML = '<div class="empty-msg">Jelenleg nincs aktív beteg rögzítve az osztályon.</div>';
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Jelenleg nincs aktív beteg rögzítve az osztályon.</td></tr>';
             return;
         }
 
@@ -264,45 +243,38 @@ async function loadDoctorPatients() {
             });
         }
 
-        // 3. HTML KÁRTYÁK GENERÁLÁSA
+        // 3. TÁBLÁZAT SOROK GENERÁLÁSA
         let html = '';
         patients.forEach(patient => {
             const presc = patientPrescMap[patient.id];
             const statusObj = getDoctorStatusDisplay(presc ? presc.status : null);
 
             html += `
-                <div class="patient-card">
-                    <div>
-                        <div class="patient-header">
-                            <div class="patient-name">${patient.name}</div>
-                            <div class="bed-badge">${patient.room_bed || 'Ágy: -'}</div>
+                <tr>
+                    <td><strong style="color:#1e293b;">${patient.name}</strong></td>
+                    <td style="font-family:monospace; font-weight:bold;">${patient.taj || '-'}</td>
+                    <td>${patient.room_bed || '-'}</td>
+                    <td>${patient.department || '-'}</td>
+                    <td class="${statusObj.className}">${statusObj.label}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn-primary" onclick="location.href='prescription.html?patientId=${patient.id}'">
+                                + Napi igénylés
+                            </button>
+                            <button class="btn-weekend" onclick="location.href='multi-day-prescription.html?patientId=${patient.id}'">
+                                📅 Hétvégi / Többnapos
+                            </button>
                         </div>
-                        <div class="patient-info-list">
-                            <div><strong>TAJ:</strong> ${patient.taj || '-'}</div>
-                            <div><strong>Osztály:</strong> ${patient.department || '-'}</div>
-                            <div class="status-line ${statusObj.className}">
-                                <strong>Mai állapot:</strong> ${statusObj.label}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-actions">
-                        <button class="btn-primary" onclick="location.href='prescription.html?patientId=${patient.id}'">
-                            + Napi igénylés
-                        </button>
-                        <button class="btn-weekend" onclick="location.href='multi-day-prescription.html?patientId=${patient.id}'">
-                            📅 Hétvégi / Többnapos
-                        </button>
-                    </div>
-                </div>
+                    </td>
+                </tr>
             `;
         });
 
-        container.innerHTML = html;
+        tbody.innerHTML = html;
 
     } catch (err) {
         console.error("Hiba a betegek betöltésekor:", err);
-        container.innerHTML = '<div class="empty-msg">Hiba történt az adatok betöltése során.</div>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Hiba történt az adatok betöltése során.</td></tr>';
     }
 }
 
