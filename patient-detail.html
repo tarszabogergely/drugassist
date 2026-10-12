@@ -11,6 +11,8 @@
 <script src="js/auth.js"></script>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
@@ -36,10 +38,11 @@ h1 {
 
 .header-right {
     font-size: 14px;
-    color: #666;
+    color: #475569;
     display: flex;
     align-items: center;
     gap: 15px;
+    font-weight: 600;
 }
 
 /* ===== CONTAINER ===== */
@@ -48,16 +51,6 @@ h1 {
     padding: 30px;
     max-width: 1100px;
     margin: auto;
-}
-
-.back-link {
-    margin-bottom: 20px;
-}
-
-.back-link a {
-    text-decoration: none;
-    color: #1976d2;
-    font-weight: 600;
 }
 
 /* ===== PATIENT CARD ===== */
@@ -164,8 +157,8 @@ tr:hover {
 <header>
     <h1>DrugAssist – Beteg adatlap</h1>
     <div class="header-right">
-        <div><a href="patients-list.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a betegekhez</a></div>
-        <div><span id="userName">Kovács Anna</span> | <span id="dateTime"></span></div>
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-size:18px; font-weight:600;" title="Kezdőlap">🏠</a></div>
+        <div><span id="userName">Betöltés...</span> | <span id="dateTime"></span></div>
     </div>
 </header>
 
@@ -210,10 +203,25 @@ tr:hover {
 <script>
 let currentPatientId = null;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓ KIJELZÉSE
     const user = Auth.requireAuth();
     if (user) {
-        document.getElementById("userName").innerText = user.name;
+        document.getElementById("userName").innerText = user.name || user.email;
+
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile && profile.full_name) {
+                document.getElementById("userName").innerText = profile.full_name;
+            }
+        } catch (e) {
+            console.error("Profil név betöltési hiba:", e);
+        }
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -257,22 +265,22 @@ async function loadPatientDetail(patientId) {
             document.getElementById("patientTaj").innerText = patient.taj || '-';
             
             // Születési dátum és életkor formázása
-if (patient.birth_date) {
-    const bDate = new Date(patient.birth_date);
-    const formattedDate = bDate.toLocaleDateString('hu-HU');
-    
-    // Életkor kiszámítása
-    const today = new Date();
-    let age = today.getFullYear() - bDate.getFullYear();
-    const m = today.getMonth() - bDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
-        age--;
-    }
-    
-    document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
-} else {
-    document.getElementById("patientBirthDate").innerText = '-';
-}
+            if (patient.birth_date) {
+                const bDate = new Date(patient.birth_date);
+                const formattedDate = bDate.toLocaleDateString('hu-HU');
+                
+                // Életkor kiszámítása
+                const today = new Date();
+                let age = today.getFullYear() - bDate.getFullYear();
+                const m = today.getMonth() - bDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+                    age--;
+                }
+                
+                document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+            } else {
+                document.getElementById("patientBirthDate").innerText = '-';
+            }
             document.getElementById("patientDept").innerText = patient.department || '-';
         }
 
@@ -312,7 +320,7 @@ if (patient.birth_date) {
                     <td style="font-family:monospace; font-weight:600; color:#334155;">${barcodeStr}</td>
                     <td class="${statusObj.className}">${statusObj.label}</td>
                     <td style="text-align: center;">
-                        <button class="pdf-btn" onclick="location.href='pdfpatient-detail.html?prescriptionId=${p.id}'">PDF megnyitás</button>
+                        <button class="pdf-btn" onclick="location.href='patient-view.html?prescriptionId=${p.id}'">Megnyitás</button>
                     </td>
                     <td style="text-align: center;">
                         <button class="label-btn" onclick="location.href='pdflabel.html?prescriptionId=${p.id}'">Címke nyomtatás</button>
