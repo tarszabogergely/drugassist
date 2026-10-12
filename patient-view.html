@@ -227,8 +227,6 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 </div>
 
 <script>
-let currentPrescriptionId = null;
-
 document.addEventListener("DOMContentLoaded", async () => {
     // 1. AUTENTIKÁCIÓ ÉS USER BEÁLLÍTÁSA
     const user = Auth.requireAuth();
@@ -249,64 +247,71 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE (A korábbi ward.html-re vagy dashboardra)
+    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE
     history.pushState(null, null, location.href);
     window.onpopstate = function () {
-        window.location.href = 'ward.html';
+        window.location.href = 'dashboard.html';
     };
 
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('patientId');
-    currentPrescriptionId = urlParams.get('prescriptionId');
+    const prescriptionId = urlParams.get('prescriptionId');
 
-    if (patientId) {
-        await loadPatientAndPrescription(patientId, currentPrescriptionId);
+    // JAVÍTÁS: BÁRMELYIK PARAMÉTER LÉTEZIK, LEFUTTATJUK A BETÖLTÉST
+    if (patientId || prescriptionId) {
+        await loadPatientAndPrescription(patientId, prescriptionId);
+    } else {
+        document.getElementById("patientName").innerText = "Hiba: Hiányzó beteg / igénylés azonosító!";
     }
 });
 
 async function loadPatientAndPrescription(patientId, prescriptionId) {
     try {
-        // BETEG ADATAI
-        const { data: patient } = await window.supabaseClient
-            .from('patients')
-            .select('*')
-            .eq('id', patientId)
-            .single();
-
-        if (patient) {
-            document.getElementById("patientName").innerText = patient.name;
-            document.getElementById("patientTaj").innerText = patient.taj || '-';
-
-            if (patient.birth_date) {
-                const bDate = new Date(patient.birth_date);
-                const formattedDate = bDate.toLocaleDateString('hu-HU');
-                const today = new Date();
-                let age = today.getFullYear() - bDate.getFullYear();
-                const m = today.getMonth() - bDate.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
-                document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
-            }
-
-            document.getElementById("patientWard").innerText = patient.department || '-';
-            document.getElementById("patientBed").innerText = patient.room_bed || '-';
-        }
-
-        // LEKÉRDEZZÜK A PRESCRIPTION-T A TÉTELEKKEL ÉS A MASTER TÁBLÁKKAL
+        // 1. PRESCRIPTION LEKÉRDEZÉSE (HA VAN PRESCRIPTION_ID, AZ ALAPJÁN, HA NINCS, A PATIENT_ID ALAPJÁN A LEGFRISSEBBET)
         let query = window.supabaseClient
             .from('prescriptions')
-            .select('*, prescription_items(*, pupha_master(*))')
-            .eq('patient_id', patientId);
+            .select('*, prescription_items(*, pupha_master(*))');
 
         if (prescriptionId) {
             query = query.eq('id', prescriptionId);
-        } else {
-            query = query.order('created_at', { ascending: false }).limit(1);
+        } else if (patientId) {
+            query = query.eq('patient_id', patientId).order('created_at', { ascending: false }).limit(1);
         }
 
-        const { data: pData } = await query;
+        const { data: pData, error: prErr } = await query;
+        if (prErr) throw prErr;
+
         const prescription = pData && pData.length > 0 ? pData[0] : null;
 
         if (prescription) {
+            // A PRESCRIPTION-BŐL MEGKAPJUK A VALÓDI PATIENT_ID-T IS
+            const targetPatientId = patientId || prescription.patient_id;
+
+            // 2. BETEG ADATAI LEKÉRDEZÉSE
+            const { data: patient } = await window.supabaseClient
+                .from('patients')
+                .select('*')
+                .eq('id', targetPatientId)
+                .single();
+
+            if (patient) {
+                document.getElementById("patientName").innerText = patient.name;
+                document.getElementById("patientTaj").innerText = patient.taj || '-';
+
+                if (patient.birth_date) {
+                    const bDate = new Date(patient.birth_date);
+                    const formattedDate = bDate.toLocaleDateString('hu-HU');
+                    const today = new Date();
+                    let age = today.getFullYear() - bDate.getFullYear();
+                    const m = today.getMonth() - bDate.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
+                    document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+                }
+
+                document.getElementById("patientWard").innerText = patient.department || '-';
+                document.getElementById("patientBed").innerText = patient.room_bed || '-';
+            }
+
             document.getElementById("preparationId").innerText = prescription.barcode || 'DA-20261009-0001';
             document.getElementById("pharmacyNoteView").innerText = prescription.pharmacy_notes || 'Nincs rögzített megjegyzés.';
 
@@ -315,10 +320,13 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
 
             // TÁBLÁZAT RENDERELÉS
             renderMedicationTable(prescription.prescription_items || []);
+        } else {
+            document.getElementById("patientName").innerText = "Nem található igénylés ehhez a beteghez.";
         }
 
     } catch (err) {
         console.error("Betöltési hiba:", err);
+        document.getElementById("patientName").innerText = "Hiba történt az adatok betöltésekor.";
     }
 }
 
