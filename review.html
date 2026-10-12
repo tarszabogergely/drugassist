@@ -41,6 +41,7 @@ header h1 {
 .user-info {
     font-size: 14px;
     color: #546e7a;
+    font-weight: 600;
 }
 
 .container {
@@ -122,7 +123,7 @@ header h1 {
 }
 
 .drug-cell {
-    width: 340px;
+    width: 380px;
 }
 
 .drug-name {
@@ -339,7 +340,9 @@ header h1 {
 
 <header>
     <h1>DrugAssist – Gyógyszerészi ellenőrzés</h1>
-    <div class="user-info" id="userInfo">Gyógyszerész</div>
+    <div class="user-info">
+        <span id="userInfo">Gyógyszerész</span> | <span id="dateTime"></span>
+    </div>
 </header>
 
 <div class="container">
@@ -360,7 +363,7 @@ header h1 {
         <div id="patientBed">-</div>
         <div class="label">Készítési azonosító</div>
         <div id="productionId" style="font-weight:bold; color:#1565c0;">-</div>
-        <div class="label">Tálcázta / Készítette</div>
+        <div class="label">Készítette</div>
         <div id="preparedBy">-</div>
     </div>
 </section>
@@ -372,8 +375,6 @@ header h1 {
         <thead id="reviewHead">
             <tr>
                 <th style="text-align:left;">Gyógyszer</th>
-                <th>Éjjel</th>
-                <th>Hajnal</th>
                 <th>Reggel</th>
                 <th>Dél</th>
                 <th>Délután</th>
@@ -382,7 +383,7 @@ header h1 {
             </tr>
         </thead>
         <tbody id="medicationTable">
-            <tr><td colspan="8" style="text-align:center; color:#64748b; padding:20px;">Tételek betöltése...</td></tr>
+            <tr><td colspan="6" style="text-align:center; color:#64748b; padding:20px;">Tételek betöltése...</td></tr>
         </tbody>
     </table>
 </section>
@@ -418,13 +419,13 @@ let itemsCheckState = {}; // Tétel ID -> boolean (ellenőrizve)
 let prescriptionItems = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
-    Auth.requireAuth();
-    
-    // Felhasználói név megjelenítése
-    const user = Auth.getCurrentUser();
-    if (user && user.email) {
-        document.getElementById("userInfo").innerText = user.email;
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userInfo").innerText = user.name || user.email;
     }
+
+    updateDateTime();
+    setInterval(updateDateTime, 10000);
 
     const urlParams = new URLSearchParams(window.location.search);
     currentPatientId = urlParams.get('patientId');
@@ -443,6 +444,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 });
+
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
 
 async function loadReviewData(patientId, prescriptionId) {
     try {
@@ -465,7 +471,7 @@ async function loadReviewData(patientId, prescriptionId) {
             .from('prescriptions')
             .select(`
                 *,
-                prescription_items(*, pupha_master(*), local_inventory_master(*))
+                prescription_items(*, pupha_master:pupha_drug_id(*), local_inventory_master:local_drug_id(*))
             `)
             .eq('id', prescriptionId)
             .single();
@@ -479,21 +485,22 @@ async function loadReviewData(patientId, prescriptionId) {
         expectedBarcode = prescription.barcode || '';
         document.getElementById("productionId").innerText = expectedBarcode || 'Nincs generálva';
 
-        // Tálcázó személy nevének lekérése profilból (ha megvan)
-        if (prescription.dispensed_by) {
+        // Készítő személy (dispensed_by vagy prescribed_by) nevének lekérése Supabase profiles-ból
+        const creatorId = prescription.dispensed_by || prescription.prescribed_by;
+        if (creatorId) {
             const { data: profile } = await window.supabaseClient
                 .from('profiles')
                 .select('full_name, email')
-                .eq('id', prescription.dispensed_by)
+                .eq('id', creatorId)
                 .maybeSingle();
             
             if (profile) {
                 document.getElementById("preparedBy").innerText = profile.full_name || profile.email;
             } else {
-                document.getElementById("preparedBy").innerText = "Asszisztens";
+                document.getElementById("preparedBy").innerText = "Ismeretlen munkatárs";
             }
         } else {
-            document.getElementById("preparedBy").innerText = "Asszisztens";
+            document.getElementById("preparedBy").innerText = "Ismeretlen munkatárs";
         }
 
         prescriptionItems = prescription.prescription_items || [];
@@ -507,7 +514,7 @@ async function loadReviewData(patientId, prescriptionId) {
 function renderReviewTable(items) {
     const tbody = document.getElementById("medicationTable");
     if (!items || items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#64748b;">Nincsenek tételek ebben az igénylésben.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">Nincsenek tételek ebben az igénylésben.</td></tr>';
         return;
     }
 
@@ -538,8 +545,6 @@ function renderReviewTable(items) {
                     ${morphology ? `<div class="drug-morphology">🔍 Morfológia: ${morphology}</div>` : ''}
                     ${batchInfo ? `<div class="batch-tag">${batchInfo}</div>` : ''}
                 </td>
-                <td class="dose">${item.dose_night || 0}</td>
-                <td class="dose">${item.dose_dawn || 0}</td>
                 <td class="dose">${item.dose_morning || 0}</td>
                 <td class="dose">${item.dose_noon || 0}</td>
                 <td class="dose">${item.dose_afternoon || 0}</td>
