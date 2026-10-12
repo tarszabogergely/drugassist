@@ -79,7 +79,7 @@ header h1 {
     border-radius: 10px;
 }
 
-/* DÁTUMVÁLASZTÓ KÁRTYA A CSATOLT KÉP ALAPJÁN */
+/* DÁTUMVÁLASZTÓ KÁRTYA */
 .date-picker-box {
     display: flex;
     align-items: center;
@@ -164,7 +164,7 @@ header h1 {
     min-width: 140px;
 }
 
-/* TERÁPIA FEJLÉC & PREVIOUS LOAD BTN */
+/* TERÁPIA FEJLÉC */
 .therapy-header {
     display: flex;
     justify-content: space-between;
@@ -189,7 +189,7 @@ header h1 {
     color: white;
 }
 
-/* SEARCH & DRUG TABLE */
+/* KERESŐ ÉS TÁBLÁZAT */
 .search-box {
     display: flex;
     gap: 12px;
@@ -203,6 +203,58 @@ header h1 {
     border: 1px solid #cbd5e1;
     font-size: 15px;
     outline: none;
+}
+
+.search-results-dropdown {
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.search-result-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.15s;
+}
+
+.search-result-item:hover {
+    filter: brightness(0.96);
+}
+
+/* HELYI KÉSZLETES SOROK KIEMELT HÁTTÉRSZÍNE */
+.search-result-item.is-local {
+    background-color: #e8f5e9; /* Halványzöld háttér a helyi készletnek */
+    border-left: 4px solid #2e7d32;
+}
+
+.search-result-item.is-pupha {
+    background-color: #ffffff;
+    border-left: 4px solid #94a3b8;
+}
+
+.source-badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.badge-local {
+    background: #c8e6c9;
+    color: #1b5e20;
+}
+
+.badge-pupha {
+    background: #f1f5f9;
+    color: #475569;
 }
 
 table {
@@ -317,9 +369,9 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     </p>
 
     <div class="search-box">
-        <input type="text" id="drugSearchInput" class="search-input" placeholder="Gyógyszer keresése név vagy hatóanyag alapján (Helyi készlet & PUPHA)..." onkeyup="searchDrug(this.value)">
+        <input type="text" id="drugSearchInput" class="search-input" placeholder="Gyógyszer keresése név vagy hatóanyag alapján..." onkeyup="searchDrug(this.value)">
     </div>
-    <div id="searchResults" style="margin-bottom:15px;"></div>
+    <div id="searchResults"></div>
 
     <table>
         <thead>
@@ -351,7 +403,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 <script>
 let currentPatientId = null;
-let selectedItems = []; // { puphaDrugId, localDrugId, brandName, activeIngredient, doseMorning, doseNoon, doseEvening, doseNight }
+let selectedItems = []; // { puphaDrugId, localDrugId, brandName, activeIngredient, doseMorning, doseNoon, doseEvening, doseNight, isLocal }
 let localDrugsList = [];
 let puphaMasterList = [];
 
@@ -404,13 +456,13 @@ async function loadDrugMasters() {
     try {
         const { data: local } = await window.supabaseClient
             .from('local_inventory_master')
-            .select('id, brand_name, active_ingredient');
+            .select('id, brand_name, active_ingredient, ttt_code');
         localDrugsList = local || [];
 
         const { data: pupha } = await window.supabaseClient
             .from('pupha_master')
-            .select('id, brand_name, active_ingredient')
-            .limit(100);
+            .select('id, brand_name, active_ingredient, ttt_code')
+            .limit(300);
         puphaMasterList = pupha || [];
     } catch (e) {
         console.error("Gyógyszertörzs betöltési hiba:", e);
@@ -454,7 +506,8 @@ async function loadPreviousPrescription() {
                 doseMorning: item.dose_morning || 0,
                 doseNoon: item.dose_noon || 0,
                 doseEvening: item.dose_evening || 0,
-                doseNight: item.dose_night || 0
+                doseNight: item.dose_night || 0,
+                isLocal: !!local
             });
         });
 
@@ -498,6 +551,7 @@ function setWeekendDates(includeFriday) {
     calculateDays();
 }
 
+// 3. KOMBINÁLT INTELLIGENS KERESŐ (TTT DEDUPLIKÁCIÓVAL ÉS SZÍNEZÉSSEL)
 function searchDrug(query) {
     const container = document.getElementById("searchResults");
     if (!query || query.length < 2) {
@@ -505,47 +559,67 @@ function searchDrug(query) {
         return;
     }
 
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
 
-    // Helyi készlet matches
+    // 1. Szűrés a helyi készletből
     const localMatches = localDrugsList.filter(d =>
         d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
-    ).slice(0, 4);
+    );
 
-    // PUPHA matches
-    const puphaMatches = puphaMasterList.filter(d =>
-        d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
-    ).slice(0, 4);
+    // Létrehozunk egy TTT kód és Név készletet a helyi találatokból a kiszűréshez
+    const localTttSet = new Set(localMatches.map(m => m.ttt_code).filter(Boolean));
+    const localNameSet = new Set(localMatches.map(m => m.brand_name.toLowerCase().trim()));
 
-    let html = '<div style="background:white; border:1px solid #cbd5e1; border-radius:8px; padding:8px;">';
+    // 2. Szűrés a PUPHA törzsből (Kiszűrve azokat, amik már a Local-ban benne vannak TTT kód vagy név alapján)
+    const puphaMatches = puphaMasterList.filter(d => {
+        const matchesQuery = d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
 
-    if (localMatches.length > 0) {
-        html += '<div style="font-size:11px; font-weight:bold; color:#1565c0; padding:4px 8px;">🏠 HELYI KÉSZLET</div>';
-        localMatches.forEach(m => {
-            html += `
-                <div style="padding:8px; cursor:pointer; border-bottom:1px solid #f1f5f9;" onclick="addDrugToTable(null, '${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}')">
-                    <strong>${m.brand_name}</strong> <span style="font-size:12px; color:#64748b;">(${m.active_ingredient || '-'})</span>
-                </div>
-            `;
-        });
+        // Ha benne van a helyi készletben azonos TTT kóddal vagy névvel, kihagyjuk a PUPHA találatok közül
+        if (d.ttt_code && localTttSet.has(d.ttt_code)) return false;
+        if (localNameSet.has(d.brand_name.toLowerCase().trim())) return false;
+
+        return true;
+    });
+
+    if (localMatches.length === 0 && puphaMatches.length === 0) {
+        container.innerHTML = '<div class="search-results-dropdown" style="padding:12px; color:#64748b;">Nincs találat a megadott keresőkifejezésre.</div>';
+        return;
     }
 
-    if (puphaMatches.length > 0) {
-        html += '<div style="font-size:11px; font-weight:bold; color:#2e7d32; padding:4px 8px; margin-top:4px;">📚 PUPHA TÖRZS</div>';
-        puphaMatches.forEach(m => {
-            html += `
-                <div style="padding:8px; cursor:pointer; border-bottom:1px solid #f1f5f9;" onclick="addDrugToTable('${m.id}', null, '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}')">
-                    <strong>${m.brand_name}</strong> <span style="font-size:12px; color:#64748b;">(${m.active_ingredient || '-'})</span>
+    let html = '<div class="search-results-dropdown">';
+
+    // HELYI KÉSZLETES TALÁLATOK (Zöldes háttérrel)
+    localMatches.slice(0, 5).forEach(m => {
+        html += `
+            <div class="search-result-item is-local" onclick="addDrugToTable(null, '${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', true)">
+                <div>
+                    <strong>${m.brand_name}</strong>
+                    <div style="font-size:12px; color:#475569;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
                 </div>
-            `;
-        });
-    }
+                <span class="source-badge badge-local">🏠 Helyi készlet</span>
+            </div>
+        `;
+    });
+
+    // PUPHA TALÁLATOK (Sima fehér háttérrel)
+    puphaMatches.slice(0, 5).forEach(m => {
+        html += `
+            <div class="search-result-item is-pupha" onclick="addDrugToTable('${m.id}', null, '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', false)">
+                <div>
+                    <strong>${m.brand_name}</strong>
+                    <div style="font-size:12px; color:#64748b;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
+                </div>
+                <span class="source-badge badge-pupha">📚 PUPHA törzs</span>
+            </div>
+        `;
+    });
 
     html += '</div>';
     container.innerHTML = html;
 }
 
-function addDrugToTable(puphaId, localId, brandName, activeIngredient) {
+function addDrugToTable(puphaId, localId, brandName, activeIngredient, isLocal) {
     selectedItems.push({
         puphaDrugId: puphaId,
         localDrugId: localId,
@@ -554,7 +628,8 @@ function addDrugToTable(puphaId, localId, brandName, activeIngredient) {
         doseMorning: 1,
         doseNoon: 0,
         doseEvening: 0,
-        doseNight: 0
+        doseNight: 0,
+        isLocal: isLocal
     });
     document.getElementById("searchResults").innerHTML = '';
     document.getElementById("drugSearchInput").value = '';
@@ -570,9 +645,12 @@ function renderSelectedDrugs() {
 
     let html = '';
     selectedItems.forEach((item, idx) => {
+        const rowBg = item.isLocal ? 'style="background-color:#f0fdf4;"' : '';
+        const badge = item.isLocal ? '<span class="source-badge badge-local" style="margin-left:6px;">Local</span>' : '';
+
         html += `
-            <tr>
-                <td><strong>${item.brandName}</strong></td>
+            <tr ${rowBg}>
+                <td><strong>${item.brandName}</strong> ${badge}</td>
                 <td>${item.activeIngredient || '-'}</td>
                 <td style="text-align:center;"><input type="number" class="dose-input" value="${item.doseMorning}" onchange="selectedItems[${idx}].doseMorning = this.value"></td>
                 <td style="text-align:center;"><input type="number" class="dose-input" value="${item.doseNoon}" onchange="selectedItems[${idx}].doseNoon = this.value"></td>
