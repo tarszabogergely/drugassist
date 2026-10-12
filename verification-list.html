@@ -36,6 +36,12 @@ h1 { margin: 0; font-size: 20px; color: #1565c0; }
     gap: 15px;
 }
 
+.user-info {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 600;
+}
+
 .container { padding: 30px; max-width: 1200px; margin: auto; }
 
 .section { margin-bottom: 40px; }
@@ -110,8 +116,10 @@ tr:hover { background-color: #fafafa; }
 <header>
     <h1>DrugAssist – Ellenőrzésre vár</h1>
     <div class="header-right">
-        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
-        <div id="dateTime" style="color:#64748b; font-size:14px;"></div>
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-size:18px; font-weight:600;" title="Kezdőlap">🏠</a></div>
+        <div class="user-info">
+            <span id="userName">Betöltés...</span> | <span id="dateTime"></span>
+        </div>
     </div>
 </header>
 
@@ -120,8 +128,27 @@ tr:hover { background-color: #fafafa; }
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-    Auth.requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓNÉV KIJELZÉSE
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name || user.email;
+
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile && profile.full_name) {
+                document.getElementById("userName").innerText = profile.full_name;
+            }
+        } catch (e) {
+            console.error("Profil név betöltési hiba:", e);
+        }
+    }
+
     loadVerificationList();
 });
 
@@ -129,7 +156,7 @@ async function loadVerificationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. LÉPÉS: 'dispensed' státuszú igénylések lekérése (csak a meglévő created_at oszlopot használjuk)
+        // 1. LÉPÉS: 'dispensed' státuszú igénylések lekérése tételekkel együtt
         const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
             .select('id, created_at, patient_id, prescription_items(id)')
@@ -198,7 +225,7 @@ async function loadVerificationList() {
                                 <th>Beteg neve</th>
                                 <th>Ágy</th>
                                 <th>Kiadagolva</th>
-                                <th>Tételek</th>
+                                <th>Gyógyszersorok</th>
                                 <th style="text-align: right;">Művelet</th>
                             </tr>
                         </thead>
@@ -213,7 +240,7 @@ async function loadVerificationList() {
                         <td><strong style="color:#1e293b;">${item.patientName}</strong></td>
                         <td>${item.bed}</td>
                         <td>${timeStr}</td>
-                        <td><strong style="color:#0f172a;">${item.itemCount} db</strong></td>
+                        <td>${item.itemCount} tétel</td>
                         <td style="text-align: right;">
                             <button class="action-btn" onclick="location.href='review.html?patientId=${item.patient_id}&prescriptionId=${item.id}'">Vizuális Ellenőrzés</button>
                         </td>
