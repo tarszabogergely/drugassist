@@ -357,11 +357,11 @@ const Prescription = {
                 pupha_id: item.pupha_id || null,
                 substituted_name: item.brand_name,
                 substituted_ingredient: item.active_ingredient,
-                dose_morning: item.dose_morning,
-                dose_noon: item.dose_noon,
-                dose_evening: item.dose_evening,
-                dose_night: item.dose_night,
-                is_patient_brought: item.is_patient_brought
+                dose_morning: item.dose_morning || 0,
+                dose_noon: item.dose_noon || 0,
+                dose_evening: item.dose_evening || 0,
+                dose_night: item.dose_night || 0,
+                is_patient_brought: !!item.is_patient_brought
             }));
 
             const { error: itemsErr } = await window.supabaseClient
