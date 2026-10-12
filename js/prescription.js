@@ -40,45 +40,33 @@ const Prescription = {
             
             document.getElementById("patientInfo").innerText = `TAJ: ${patient.taj || '-'} | Születési dátum: ${birthDateStr}${ageStr} | Ágy: ${patient.room_bed || '-'}`;
 
-            // 2. Mai nap kezdetének kiszámítása helyi időzóna alapján (nem UTC ISO stringgel)
-            const now = new Date();
-            const localTodayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
-
+            // 2. Legfrissebb igénylés lekérése a beteghez (státusztól függetlenül)
             const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
-                .select('*, prescription_items(*, pupha_master(*))')
+                .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
                 .eq('patient_id', patientId)
-                .gte('created_at', localTodayStart)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(1);
 
-            let existingPrescription = (prescriptions && prescriptions.length > 0) ? prescriptions[0] : null;
-
-            // Tartalék: Ha a mai dátumszűrő nem találná, de van nyitott igénylés
-            if (!existingPrescription) {
-                const { data: fallbackPrescs } = await window.supabaseClient
-                    .from('prescriptions')
-                    .select('*, prescription_items(*, pupha_master(*))')
-                    .eq('patient_id', patientId)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (fallbackPrescs && fallbackPrescs.length > 0) {
-                    existingPrescription = fallbackPrescs[0];
-                }
-            }
+            const existingPrescription = (prescriptions && prescriptions.length > 0) ? prescriptions[0] : null;
 
             if (existingPrescription) {
                 this.currentPrescriptionId = existingPrescription.id;
                 this.currentPrescriptionStatus = existingPrescription.status;
 
-                // Meglévő tételek betöltése a tömbbe
+                // Meglévő tételek betöltése a tömbbe (kezelve a helyettesített és patikai törzs neveket is)
                 this.orderItems = (existingPrescription.prescription_items || []).map(item => {
                     const pupha = item.pupha_master;
+                    const local = item.local_inventory_master;
+                    
+                    const name = item.substituted_name || (local ? local.brand_name : (pupha ? pupha.brand_name : 'Gyógyszer'));
+                    const ingredient = item.substituted_ingredient || (local ? local.active_ingredient : (pupha ? pupha.active_ingredient : ''));
+
                     return {
                         id: item.id,
                         pupha_id: item.pupha_id,
-                        brand_name: item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen gyógyszer'),
-                        active_ingredient: item.substituted_ingredient || (pupha ? pupha.active_ingredient : ''),
+                        brand_name: name,
+                        active_ingredient: ingredient,
                         dose_morning: item.dose_morning || 0,
                         dose_noon: item.dose_noon || 0,
                         dose_evening: item.dose_evening || 0,
@@ -90,8 +78,10 @@ const Prescription = {
                 // Státusz ellenőrzés
                 const st = existingPrescription.status;
                 if (st === 'reviewed' || st === 'dispensed' || st === 'completed') {
+                    // Zárolt állapot, de A GYÓGYSZEREK LÁTSZANAK!
                     this.lockForm();
                 } else {
+                    // Szerkeszthető módosítás
                     this.setEditMode();
                 }
 
@@ -143,10 +133,12 @@ const Prescription = {
     },
 
     enableInputs: function(enabled) {
-        const inputs = document.querySelectorAll("#prescriptionTableBody input");
-        inputs.forEach(i => i.disabled = !enabled);
-        const btns = document.querySelectorAll("#prescriptionTableBody button");
-        btns.forEach(b => b.disabled = !enabled);
+        setTimeout(() => {
+            const inputs = document.querySelectorAll("#prescriptionTableBody input");
+            inputs.forEach(i => i.disabled = !enabled);
+            const btns = document.querySelectorAll("#prescriptionTableBody button");
+            btns.forEach(b => b.disabled = !enabled);
+        }, 50);
     },
 
     // PuPha Törzs Kereső
@@ -269,6 +261,9 @@ const Prescription = {
         });
 
         tbody.innerHTML = html;
+        if (isLocked) {
+            this.enableInputs(false);
+        }
     },
 
     // Előző jóváhagyott terápia másolása
@@ -278,7 +273,7 @@ const Prescription = {
         try {
             const { data: pastPrescriptions } = await window.supabaseClient
                 .from('prescriptions')
-                .select('*, prescription_items(*, pupha_master(*))')
+                .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
                 .eq('patient_id', this.currentPatient.id)
                 .in('status', ['reviewed', 'dispensed', 'completed'])
                 .order('created_at', { ascending: false })
@@ -292,10 +287,11 @@ const Prescription = {
             const pastItems = pastPrescriptions[0].prescription_items || [];
             this.orderItems = pastItems.map(item => {
                 const pupha = item.pupha_master;
+                const local = item.local_inventory_master;
                 return {
                     pupha_id: item.pupha_id,
-                    brand_name: item.substituted_name || (pupha ? pupha.brand_name : ''),
-                    active_ingredient: item.substituted_ingredient || (pupha ? pupha.active_ingredient : ''),
+                    brand_name: item.substituted_name || (local ? local.brand_name : (pupha ? pupha.brand_name : '')),
+                    active_ingredient: item.substituted_ingredient || (local ? local.active_ingredient : (pupha ? pupha.active_ingredient : '')),
                     dose_morning: item.dose_morning || 0,
                     dose_noon: item.dose_noon || 0,
                     dose_evening: item.dose_evening || 0,
