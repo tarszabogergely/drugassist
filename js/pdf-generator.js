@@ -4,14 +4,20 @@
 
 async function generateDepartmentPdf(departmentName, targetDate) {
     const selectedDate = targetDate || window.selectedDate || new Date();
-    const dateStr = selectedDate.toLocaleDateString('hu-HU', { year: 'numeric', month: 'long', day: 'numeric' });
+    
+    // Dátum formázások
+    const dateFormattedForTitle = selectedDate.toLocaleDateString('hu-HU', { year: 'numeric', month: 'long', day: 'numeric' });
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const dateIso = `${year}-${month}-${day}`;
+
+    // Dinamikus fájlnév beállítása
+    const cleanDeptName = departmentName.replace(/[^a-zA-Z0-9áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/g, '_');
+    const fileName = `DA_${dateIso}_${cleanDeptName}`;
 
     try {
-        // 1. ADATOK LEKÉRDEZÉSE A SUPABASE-BŐL A KIVÁLASZTOTT NAPRA ÉS OSZTÁLYRA
-        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0).toISOString();
-        const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).toISOString();
-
-        // Betegek lekérése az adott osztályról
+        // 1. BETEGEK LEKÉRDEZÉSE AZ OSZTÁLYRÓL
         const { data: patients, error: pErr } = await window.supabaseClient
             .from('patients')
             .select('*')
@@ -19,45 +25,56 @@ async function generateDepartmentPdf(departmentName, targetDate) {
             .order('room_bed', { ascending: true });
 
         if (pErr || !patients || patients.length === 0) {
-            alert(`Nincs aktív beteg a(z) "${departmentName}" osztályon erre a napra.`);
+            alert(`Nincs aktív beteg a(z) "${departmentName}" osztályon.`);
             return;
         }
 
         const patientIds = patients.map(p => p.id);
 
-        // Igénylések és tételek lekérése a felelős személyekkel
+        // 2. IGÉNYLÉSEK LEKÉRDEZÉSE A BETEGEKHEZ (TÖBBLÉPCSŐS BIZTONSÁGI BIZTOSÍTÁSSAL)
         const { data: prescriptions, error: prErr } = await window.supabaseClient
             .from('prescriptions')
             .select(`
                 *,
-                prescribed_profile:profiles!prescribed_by(full_name, email),
-                reviewed_profile:profiles!reviewed_by(full_name, email),
-                dispensed_profile:profiles!dispensed_by(full_name, email),
-                verified_profile:profiles!verified_by(full_name, email),
                 prescription_items(*, pupha_master:pupha_drug_id(*), local_inventory_master:local_drug_id(*))
             `)
             .in('patient_id', patientIds)
-            .gte('created_at', startOfDay)
-            .lte('created_at', endOfDay);
+            .order('created_at', { ascending: false });
 
         if (prErr) {
             console.error("PDF Adatlekérdezési hiba:", prErr);
         }
 
+        // Legfrissebb igénylés hozzárendelése betegenként
         const prescMap = {};
         if (prescriptions) {
             prescriptions.forEach(p => {
-                prescMap[p.patient_id] = p;
+                if (!prescMap[p.patient_id]) {
+                    prescMap[p.patient_id] = p;
+                }
             });
         }
 
-        // 2. NYOMTATÁSI HTML DOKUMENTUM FELÉPÍTÉSE
+        // PROFILOK LEKÉRDEZÉSE A NEVEKHEZ
+        const { data: profiles } = await window.supabaseClient
+            .from('profiles')
+            .select('*');
+
+        const profileMap = {};
+        if (profiles) {
+            profiles.forEach(pr => {
+                profileMap[pr.id] = pr.full_name || pr.email;
+                if (pr.user_id) profileMap[pr.user_id] = pr.full_name || pr.email;
+            });
+        }
+
+        // 3. HTML / NYOMTATÁSI DOKUMENTUM FELÉPÍTÉSE
         let printContent = `
         <!DOCTYPE html>
         <html lang="hu">
         <head>
         <meta charset="UTF-8">
-        <title>Osztályos Gyógyszerelési Összesítő - ${departmentName}</title>
+        <title>${fileName}</title>
         <style>
             @page { size: A4 portrait; margin: 10mm; }
             body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1e293b; margin: 0; padding: 0; }
@@ -91,7 +108,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
         </head>
         <body>
 
-        <!-- DOKUMENTUM FEJLÉC (KÓRHÁZI ÉS INTÉZMÉNYI CSÉLE) -->
+        <!-- DOKUMENTUM FEJLÉC -->
         <table class="header-table">
             <tr>
                 <td>
@@ -100,7 +117,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
                 </td>
                 <td class="header-meta">
                     <strong>Osztály:</strong> ${departmentName}<br>
-                    <strong>Dátum:</strong> ${dateStr}
+                    <strong>Dátum:</strong> ${dateFormattedForTitle}
                 </td>
             </tr>
         </table>
@@ -111,12 +128,14 @@ async function generateDepartmentPdf(departmentName, targetDate) {
             const birthStr = patient.birth_date ? new Date(patient.birth_date).toLocaleDateString('hu-HU') : '-';
             const presc = prescMap[patient.id];
 
-            // Személyek nevei az audit trailhez
-            const prescribedBy = presc?.prescribed_profile?.full_name || presc?.prescribed_profile?.email || 'Dr. Tarszabó Gergely';
-            const reviewedBy = presc?.reviewed_profile?.full_name || presc?.reviewed_profile?.email || 'Dr. Tarszabó Gergely';
-            const dispensedBy = presc?.dispensed_profile?.full_name || presc?.dispensed_profile?.email || 'Gyógyszertári Asszisztens';
-            const verifiedBy = presc?.verified_profile?.full_name || presc?.verified_profile?.email || 'Dr. Tarszabó Gergely';
+            // Felelős személyek neveinek lekérése
+            const defaultDoctor = 'Dr. Tarszabó Gergely';
+            const prescribedBy = profileMap[presc?.prescribed_by] || defaultDoctor;
+            const reviewedBy = profileMap[presc?.reviewed_by] || defaultDoctor;
+            const dispensedBy = profileMap[presc?.dispensed_by] || 'Gyógyszertári Asszisztens';
+            const verifiedBy = profileMap[presc?.verified_by] || defaultDoctor;
 
+            const barcode = presc?.barcode || (presc?.id ? 'DA-' + presc.id.slice(0, 8).toUpperCase() : 'Nincs azonosító');
             const items = presc?.prescription_items || [];
 
             printContent += `
@@ -131,7 +150,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
 
                 <!-- AUDIT TRAIL -->
                 <div class="audit-trail">
-                    <div class="audit-item"><strong>Gyógyszerelés azonosító:</strong> ${presc?.barcode || 'Nincs generálva'}</div>
+                    <div class="audit-item"><strong>Gyógyszerelés azonosító:</strong> ${barcode}</div>
                     <div class="audit-item"><strong>Igénylést feladta:</strong> ${prescribedBy}</div>
                     <div class="audit-item"><strong>Jóváhagyta (Patika):</strong> ${reviewedBy}</div>
                     <div class="audit-item"><strong>Gyógyszerelést készítette:</strong> ${dispensedBy}</div>
@@ -220,9 +239,10 @@ async function generateDepartmentPdf(departmentName, targetDate) {
         </html>
         `;
 
-        // 3. MEGNYITÁS ÉS AUTOMATIKUS NYOMTATÁSI ABLAK
+        // 4. DOKUMENTUM CÍM BEÁLLÍTÁSA A MENTÉSHEZ ÉS MEGNYITÁS
         const printWindow = window.open('', '_blank');
         printWindow.document.write(printContent);
+        printWindow.document.title = fileName;
         printWindow.document.close();
         printWindow.focus();
         setTimeout(() => {
