@@ -11,6 +11,8 @@
 <script src="js/auth.js"></script>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
@@ -36,6 +38,71 @@ h1 { margin: 0; font-size: 20px; color: #1565c0; }
 
 .container { padding: 30px; max-width: 1100px; margin: auto; }
 
+/* DÁTUM LAPOZÓ SÁV */
+.date-picker-card {
+    background: white;
+    border-radius: 14px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.date-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.date-btn {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 14px;
+}
+
+.date-btn:hover { background: #bbdefb; }
+
+.date-input {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-family: inherit;
+    font-weight: 600;
+    color: #1e293b;
+    outline: none;
+    cursor: pointer;
+}
+
+.pdf-btn {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.pdf-btn:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
@@ -46,7 +113,7 @@ table {
 }
 
 th, td { padding: 14px; font-size: 14px; }
-th { background-color: #f0f2f5; text-align: left; }
+th { background-color: #f8fafc; text-align: left; color: #475569; font-weight: 600; }
 tr:not(:last-child) { border-bottom: 1px solid #eee; }
 tr:hover { background-color: #fafafa; }
 
@@ -89,51 +156,99 @@ button:hover { background: #1565c0; }
     <h1 id="wardTitle">DrugAssist – Osztály</h1>
     <div class="header-right">
         <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a></div>
-        <div id="dateTime"></div>
+        <div id="dateTime" style="color:#64748b; font-size:14px; font-weight:600;"></div>
     </div>
 </header>
 
 <div class="container">
 
-<div id="tableContainer">
-    <table id="wardTable">
-        <thead>
-            <tr>
-                <th>Beteg</th>
-                <th>Ágy</th>
-                <th>Státusz</th>
-                <th style="text-align: right;">Aktivitás</th>
-            </tr>
-        </thead>
-        <tbody id="wardTableBody">
-            <tr>
-                <td colspan="4" style="text-align:center; color:#64748b; padding:24px;">Betegek betöltése...</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+    <!-- DÁTUM LAPOZÓ & PDF CARD -->
+    <div class="date-picker-card">
+        <div class="date-controls">
+            <button class="date-btn" onclick="changeDate(-1)">◀ Előző nap</button>
+            <input type="date" id="dateInput" class="date-input" onchange="onDateInputChange(this.value)">
+            <button class="date-btn" onclick="changeDate(1)">Következő nap ▶</button>
+            <button class="date-btn" style="background:#2e7d32; color:white; border:none;" onclick="setToday()">Mai nap</button>
+        </div>
+        <button class="pdf-btn" onclick="generateDepartmentPdf(currentDept)">
+            📄 Osztályos összesítő PDF
+        </button>
+    </div>
+
+    <div id="tableContainer">
+        <table id="wardTable">
+            <thead>
+                <tr>
+                    <th>Beteg</th>
+                    <th>Ágy</th>
+                    <th>Státusz</th>
+                    <th style="text-align: right;">Aktivitás</th>
+                </tr>
+            </thead>
+            <tbody id="wardTableBody">
+                <tr>
+                    <td colspan="4" style="text-align:center; color:#64748b; padding:24px;">Betegek betöltése...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
 </div>
 
 <script>
 let currentDept = 'Belgyógyászat';
+let selectedDate = new Date();
 
 document.addEventListener("DOMContentLoaded", async () => {
     const user = Auth.requireAuth();
 
-    // 1. Osztály kiolvasása URL paraméterből vagy a felhasználoi kontextusból
+    // 1. Osztály kiolvasása URL paraméterből vagy a felhasználói kontextusból
     const urlParams = new URLSearchParams(window.location.search);
     currentDept = urlParams.get('department') || (user ? user.activeDepartment : 'Belgyógyászat');
 
     document.getElementById("wardTitle").innerText = `DrugAssist – ${currentDept}`;
 
-    await loadWardPatients();
+    // Mai nap beállítása és betöltése
+    setToday();
 });
+
+function setToday() {
+    selectedDate = new Date();
+    updateDatePickerUI();
+    loadWardPatients();
+}
+
+function changeDate(days) {
+    selectedDate.setDate(selectedDate.getDate() + days);
+    updateDatePickerUI();
+    loadWardPatients();
+}
+
+function onDateInputChange(val) {
+    if (!val) return;
+    const parts = val.split('-');
+    selectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    updateDatePickerUI();
+    loadWardPatients();
+}
+
+function updateDatePickerUI() {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    
+    document.getElementById("dateInput").value = `${year}-${month}-${day}`;
+}
 
 async function loadWardPatients() {
     const tbody = document.getElementById("wardTableBody");
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b; padding:24px;">Betegek betöltése...</td></tr>';
 
     try {
+        // Kiválasztott nap kezdetének és végének kiszámítása helyi időben
+        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0).toISOString();
+        const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).toISOString();
+
         // 1. Aktív betegek lekérése az adott osztályról
         const { data: patients, error: pErr } = await window.supabaseClient
             .from('patients')
@@ -151,11 +266,13 @@ async function loadWardPatients() {
 
         const patientIds = patients.map(p => p.id);
 
-        // 2. Igénylések lekérése a betegekhez
+        // 2. Igénylések lekérése a betegekhez a kiválasztott napra
         const { data: prescriptions, error: prErr } = await window.supabaseClient
             .from('prescriptions')
             .select('id, patient_id, status, created_at')
             .in('patient_id', patientIds)
+            .gte('created_at', startOfDay)
+            .lte('created_at', endOfDay)
             .order('created_at', { ascending: false });
 
         if (prErr) console.error("Prescriptions hiba:", prErr);
@@ -193,8 +310,8 @@ async function loadWardPatients() {
                     targetUrl = `patient.html?patientId=${patient.id}&prescriptionId=${presc.id}`;
                 } else if (presc.status === 'completed') {
                     statusText = 'Készen van';
-                    dotClass = 'gray';
-                    targetUrl = `patient.html?patientId=${patient.id}&prescriptionId=${presc.id}`;
+                    dotClass = 'green';
+                    targetUrl = `review.html?patientId=${patient.id}&prescriptionId=${presc.id}`;
                 }
             }
 
@@ -221,6 +338,11 @@ async function loadWardPatients() {
         console.error("Hiba az osztályos adatok betöltésekor:", err);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#c62828; padding:24px;">Hiba történt az adatok betöltése során.</td></tr>';
     }
+}
+
+function generateDepartmentPdf(departmentName) {
+    const formattedDate = selectedDate.toLocaleDateString('hu-HU');
+    alert(`📄 Osztályos összesítő PDF generálása a(z) "${departmentName}" osztályra (${formattedDate})...`);
 }
 
 function updateDateTime() {
