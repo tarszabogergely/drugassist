@@ -31,19 +31,26 @@ header {
 header h1 {
     margin: 0;
     font-size: 22px;
-    color: #1e293b; /* Vagy #000000 feketéhez */
+    color: #1e293b;
 }
-    
-.user-info { color: #666; font-size: 14px; }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 600;
+}
 
 .container {
     max-width: 1200px;
     margin: auto;
     padding: 32px;
 }
-
-.back { margin-bottom: 24px; }
-.back a { text-decoration: none; color: #1976d2; font-weight: 600; }
 
 .card {
     background: white;
@@ -237,16 +244,15 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
 
 <header>
     <h1>DrugAssist – Gyógyszerelés</h1>
-    <div class="user-info">
-        <span id="userName">Asszisztens</span> | <span id="dateTime"></span>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-size:18px; font-weight:600;" title="Kezdőlap">🏠</a></div>
+        <div class="user-info">
+            <span id="userName">Betöltés...</span> | <span id="dateTime"></span>
+        </div>
     </div>
 </header>
 
 <div class="container">
-
-<div class="back">
-    <a href="medication-list.html">← Vissza a gyógyszerelésre váró listához</a>
-</div>
 
 <!-- BETEG ADATOK -->
 <section class="card">
@@ -348,7 +354,32 @@ let currentScanningItemIndex = null;
 let currentScanningDrug = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    Auth.requireAuth();
+    // 1. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓNÉV KIJELZÉSE
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name || user.email;
+
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile && profile.full_name) {
+                document.getElementById("userName").innerText = profile.full_name;
+            }
+        } catch (e) {
+            console.error("Profil név betöltési hiba:", e);
+        }
+    }
+
+    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE -> medication-list.html
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        window.location.href = 'medication-list.html';
+    };
+
     await loadLocalInventory();
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -583,76 +614,6 @@ async function openBatchModal(drug) {
     document.getElementById("batchModal").style.display = "flex";
 }
 
-async function saveBatchAndConfirm() {
-    const lot = document.getElementById("inputLotNumber").value.trim();
-    const exp = document.getElementById("inputExpiryDate").value;
-
-    if (!lot || !exp) {
-        alert("Kérjük, adja meg a Gyári számot (LOT) és a Lejárati dátumot (EXP)!");
-        return;
-    }
-
-    const currentItem = prescriptionItems[currentScanningItemIndex];
-    const pupha = currentItem ? currentItem.pupha_master : null;
-    const drugName = (currentScanningDrug && currentScanningDrug.brand_name) 
-        || (currentItem ? (currentItem.substituted_name || (pupha ? pupha.brand_name : '')) : '').trim();
-
-    const tttCode = (currentScanningDrug && currentScanningDrug.ttt_code) 
-        || (pupha ? pupha.ttt_code : null);
-
-    try {
-        // 1. Mindkét oszlopnév-párt kitöltjük az inventory_batches táblában
-        const batchPayload = {
-            drug_name: drugName,
-            ttt_code: tttCode,
-            lot_number: lot,
-            batch_number: lot,            // feloldja a batch_number NOT NULL kényszert
-            expiry_date: exp,
-            expiration_date: exp         // feloldja az expiration_date NOT NULL kényszert
-        };
-
-        const { data: batchData, error: batchErr } = await window.supabaseClient
-            .from('inventory_batches')
-            .insert([batchPayload])
-            .select();
-
-        if (batchErr) {
-            console.error("inventory_batches beszúrási hiba:", batchErr);
-            alert(`Hiba az inventory_batches táblába mentéskor:\n${batchErr.message} (Kód: ${batchErr.code})`);
-            return;
-        } else {
-            console.log("Sikeresen elmentve az inventory_batches táblába:", batchData);
-        }
-
-        // 2. Mentés a konkrét beteg igényléséhez (prescription_items tábla)
-        if (currentItem && currentItem.id) {
-            const { error: itemErr } = await window.supabaseClient
-                .from('prescription_items')
-                .update({
-                    batch_number: lot,
-                    expiration_date: exp
-                })
-                .eq('id', currentItem.id);
-
-            if (itemErr) {
-                console.error("prescription_items sarzs mentési hiba:", itemErr);
-            }
-        }
-
-    } catch (e) {
-        console.error("Kivétel a sarzs mentése során:", e);
-        alert(`Váratlan hiba: ${e.message || e}`);
-    }
-
-    // Tétel frissítése az oldalon a memóriában is
-    itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
-    scannedIndices.add(currentScanningItemIndex);
-    lastScannedIndex = currentScanningItemIndex;
-
-    closeBatchModal();
-    renderMedicationTable();
-}
-
 function selectExistingBatch(lot, exp) {
     document.getElementById("inputLotNumber").value = lot;
     document.getElementById("inputExpiryDate").value = exp;
@@ -672,7 +633,12 @@ async function saveBatchAndConfirm() {
     }
 
     const currentItem = prescriptionItems[currentScanningItemIndex];
-    const drugName = currentScanningDrug ? currentScanningDrug.brand_name.trim() : '';
+    const pupha = currentItem ? currentItem.pupha_master : null;
+    const drugName = (currentScanningDrug && currentScanningDrug.brand_name) 
+        || (currentItem ? (currentItem.substituted_name || (pupha ? pupha.brand_name : '')) : '').trim();
+
+    const tttCode = (currentScanningDrug && currentScanningDrug.ttt_code) 
+        || (pupha ? pupha.ttt_code : null);
 
     try {
         // 1. Megnézzük, létezik-e már ez a sarzs az inventory_batches táblában
@@ -684,14 +650,16 @@ async function saveBatchAndConfirm() {
             .maybeSingle();
 
         if (!existingBatch) {
-            // Ha még nincs ilyen sarzs, beszúrjuk az inventory_batches táblába
+            // Beszúrás az inventory_batches törzstáblába
             const { error: insertErr } = await window.supabaseClient
                 .from('inventory_batches')
                 .insert({
                     drug_name: drugName,
-                    ttt_code: currentScanningDrug.ttt_code || null,
+                    ttt_code: tttCode,
                     lot_number: lot,
-                    expiry_date: exp
+                    batch_number: lot,
+                    expiry_date: exp,
+                    expiration_date: exp
                 });
 
             if (insertErr) {
@@ -752,7 +720,6 @@ async function finishMedication() {
             })
             .eq('id', currentPrescriptionId);
 
-        alert("Gyógyszerelés és tálcázás sikeresen lezárva!");
         window.location.href = 'medication-list.html';
     } catch (e) {
         console.error("Hiba a lezárás során:", e);
