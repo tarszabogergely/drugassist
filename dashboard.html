@@ -46,16 +46,21 @@ header h1 {
     font-size: 14px;
 }
 
+/* FIXÁLT, NEM KATTINTHATÓ JELVÉNYEK */
 .badge-select {
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
     border: 1px solid #d0d7e2;
     background: #eef4fb;
     color: #1976d2;
     font-weight: 600;
     font-size: 13px;
-    cursor: pointer;
     outline: none;
+    cursor: default;
+    opacity: 0.95;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 .badge-select.dept {
@@ -235,16 +240,16 @@ header h1 {
     <div class="header-right">
         <span id="userName" class="user-name">Munkatárs</span>
         
-        <!-- SZEREPKÖR VÁLASZTÓ -->
-        <select id="roleSelector" class="badge-select" onchange="changeRole(this.value)">
+        <!-- FIXÁLT SZEREPKÖR VÁLASZTÓ (DISABLED) -->
+        <select id="roleSelector" class="badge-select" disabled>
             <option value="pharmacist">🧪 Gyógyszerész</option>
             <option value="doctor">📋 Orvos / Igénylő</option>
             <option value="assistant">💊 Asszisztens</option>
             <option value="nurse">🏥 Ápoló</option>
         </select>
 
-        <!-- OSZTÁLY VÁLASZTÓ -->
-        <select id="deptSelector" class="badge-select dept" onchange="changeDepartment(this.value)">
+        <!-- FIXÁLT OSZTÁLY VÁLASZTÓ (DISABLED) -->
+        <select id="deptSelector" class="badge-select dept" disabled>
             <option value="Belgyógyászat">Belgyógyászat</option>
             <option value="Sebészet">Sebészet</option>
             <option value="Neurológia">Neurológia</option>
@@ -315,7 +320,6 @@ header h1 {
 document.addEventListener("DOMContentLoaded", async () => {
     const user = Auth.requireAuth();
     if (user) {
-        // Név beállítása
         document.getElementById("userName").innerText = user.name || user.email;
 
         // FELHASZNÁLÓI PROFIL LEKÉRDEZÉSE A SUPABASE-BŐL A FEJLÉC FIXÁLÁSÁHOZ
@@ -336,6 +340,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
                 const deptSel = document.getElementById("deptSelector");
                 if (deptSel && profile.department) {
+                    // Ha az adott osztály még nincs a listában, hozzáadjuk opcióként, hogy mindig helyesen jelenjen meg
+                    let exists = Array.from(deptSel.options).some(opt => opt.value === profile.department);
+                    if (!exists) {
+                        const opt = document.createElement('option');
+                        opt.value = profile.department;
+                        opt.innerText = profile.department;
+                        deptSel.appendChild(opt);
+                    }
                     deptSel.value = profile.department;
                 }
             } else {
@@ -355,7 +367,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadDashboardData() {
     try {
-        // Mai nap kezdetének kiszámítása helyi időzónában (00:00:00)
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
@@ -372,7 +383,6 @@ async function loadDashboardData() {
             return;
         }
 
-        // Osztályok és betegek térképe
         const deptPatientsMap = {};
         activePatients.forEach(p => {
             const dept = p.department || 'Egyéb Osztály';
@@ -395,7 +405,6 @@ async function loadDashboardData() {
         let cntDispensed = 0;
         let cntCompleted = 0;
 
-        // Betegenkénti igénylés státusz térkép a mai napra
         const patientTodayPrescMap = {};
 
         if (todayPrescriptions) {
@@ -441,7 +450,6 @@ async function loadDashboardData() {
                 }
             });
 
-            // Indikátor ikon és szín kiválasztása
             let indicatorClass = 'neutral';
             let indicatorIcon = '🏥';
 
@@ -459,7 +467,6 @@ async function loadDashboardData() {
                 indicatorIcon = '✓';
             }
 
-            // Státusz részletező lista összeállítása
             let statusDetails = [];
             if (submittedCount > 0) statusDetails.push(`<strong>${submittedCount}</strong> Jóváhagyásra vár`);
             if (reviewedCount > 0) statusDetails.push(`<strong>${reviewedCount}</strong> Gyógyszerelésre vár`);
@@ -487,17 +494,6 @@ async function loadDashboardData() {
         console.error("Hiba a dashboard adatok betöltésekor:", err);
         document.getElementById("wardGridContainer").innerHTML = '<div class="no-data-msg">Hiba történt az osztályos adatok betöltése során.</div>';
     }
-}
-
-function changeRole(newRole) {
-    Auth.updateContext(newRole, null);
-    if (newRole === 'doctor' || newRole === 'nurse') {
-        window.location.href = 'doctor-dashboard.html';
-    }
-}
-
-function changeDepartment(newDept) {
-    Auth.updateContext(null, newDept);
 }
 
 function updateClock() {
