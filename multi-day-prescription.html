@@ -228,9 +228,8 @@ header h1 {
     filter: brightness(0.96);
 }
 
-/* HELYI KÉSZLETES SOROK KIEMELT HÁTTÉRSZÍNE */
 .search-result-item.is-local {
-    background-color: #e8f5e9; /* Halványzöld háttér a helyi készletnek */
+    background-color: #e8f5e9;
     border-left: 4px solid #2e7d32;
 }
 
@@ -413,7 +412,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("userName").innerText = user.name || user.email;
     }
 
-    // Alapértelmezett dátumok (Mai nap -> Holnap)
     const today = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(today.getDate() + 1);
@@ -451,7 +449,7 @@ async function loadPatient(patientId) {
     }
 }
 
-// 1. HELYI KÉSZLET ÉS PUPHA KÉSZLET BETÖLTÉSE
+// 1. TELJES GYÓGYSZERTÖRZSEK BETÖLTÉSE (LIMIT NÉLKÜL)
 async function loadDrugMasters() {
     try {
         const { data: local } = await window.supabaseClient
@@ -461,15 +459,14 @@ async function loadDrugMasters() {
 
         const { data: pupha } = await window.supabaseClient
             .from('pupha_master')
-            .select('id, brand_name, active_ingredient, ttt_code')
-            .limit(300);
+            .select('id, brand_name, active_ingredient, ttt_code');
         puphaMasterList = pupha || [];
     } catch (e) {
         console.error("Gyógyszertörzs betöltési hiba:", e);
     }
 }
 
-// 2. ELŐZŐ TERÁPIA BETÖLTÉSE GOMB LOGIKÁJA
+// 2. ELŐZŐ TERÁPIA BETÖLTÉSE
 async function loadPreviousPrescription() {
     if (!currentPatientId) return;
 
@@ -551,7 +548,7 @@ function setWeekendDates(includeFriday) {
     calculateDays();
 }
 
-// 3. KOMBINÁLT INTELLIGENS KERESŐ (TTT DEDUPLIKÁCIÓVAL ÉS SZÍNEZÉSSEL)
+// 3. EGYENRANGÚ KOMBÍNÁLT KERESŐ (HELYI TÉTELEK ZÖLD KIEMELÉSÉVEL)
 function searchDrug(query) {
     const container = document.getElementById("searchResults");
     if (!query || query.length < 2) {
@@ -561,58 +558,48 @@ function searchDrug(query) {
 
     const q = query.toLowerCase().trim();
 
-    // 1. Szűrés a helyi készletből
+    // 1. Helyi készletes találatok
     const localMatches = localDrugsList.filter(d =>
         d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
-    );
+    ).map(item => ({ ...item, isLocal: true }));
 
-    // Létrehozunk egy TTT kód és Név készletet a helyi találatokból a kiszűréshez
-    const localTttSet = new Set(localMatches.map(m => m.ttt_code).filter(Boolean));
-    const localNameSet = new Set(localMatches.map(m => m.brand_name.toLowerCase().trim()));
+    // 2. PUPHA törzses találatok
+    const puphaMatches = puphaMasterList.filter(d =>
+        d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
+    ).map(item => ({ ...item, isLocal: false }));
 
-    // 2. Szűrés a PUPHA törzsből (Kiszűrve azokat, amik már a Local-ban benne vannak TTT kód vagy név alapján)
-    const puphaMatches = puphaMasterList.filter(d => {
-        const matchesQuery = d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q));
-        if (!matchesQuery) return false;
+    // Kombinált lista: Helyi találatok előre, utána PUPHA
+    const combinedMatches = [...localMatches, ...puphaMatches].slice(0, 10);
 
-        // Ha benne van a helyi készletben azonos TTT kóddal vagy névvel, kihagyjuk a PUPHA találatok közül
-        if (d.ttt_code && localTttSet.has(d.ttt_code)) return false;
-        if (localNameSet.has(d.brand_name.toLowerCase().trim())) return false;
-
-        return true;
-    });
-
-    if (localMatches.length === 0 && puphaMatches.length === 0) {
+    if (combinedMatches.length === 0) {
         container.innerHTML = '<div class="search-results-dropdown" style="padding:12px; color:#64748b;">Nincs találat a megadott keresőkifejezésre.</div>';
         return;
     }
 
     let html = '<div class="search-results-dropdown">';
 
-    // HELYI KÉSZLETES TALÁLATOK (Zöldes háttérrel)
-    localMatches.slice(0, 5).forEach(m => {
-        html += `
-            <div class="search-result-item is-local" onclick="addDrugToTable(null, '${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', true)">
-                <div>
-                    <strong>${m.brand_name}</strong>
-                    <div style="font-size:12px; color:#475569;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
+    combinedMatches.forEach(m => {
+        if (m.isLocal) {
+            html += `
+                <div class="search-result-item is-local" onclick="addDrugToTable(null, '${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', true)">
+                    <div>
+                        <strong>${m.brand_name}</strong>
+                        <div style="font-size:12px; color:#475569;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
+                    </div>
+                    <span class="source-badge badge-local">🏠 Helyi készlet</span>
                 </div>
-                <span class="source-badge badge-local">🏠 Helyi készlet</span>
-            </div>
-        `;
-    });
-
-    // PUPHA TALÁLATOK (Sima fehér háttérrel)
-    puphaMatches.slice(0, 5).forEach(m => {
-        html += `
-            <div class="search-result-item is-pupha" onclick="addDrugToTable('${m.id}', null, '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', false)">
-                <div>
-                    <strong>${m.brand_name}</strong>
-                    <div style="font-size:12px; color:#64748b;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
+            `;
+        } else {
+            html += `
+                <div class="search-result-item is-pupha" onclick="addDrugToTable('${m.id}', null, '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}', false)">
+                    <div>
+                        <strong>${m.brand_name}</strong>
+                        <div style="font-size:12px; color:#64748b;">${m.active_ingredient || 'Nincs hatóanyag megadva'}</div>
+                    </div>
+                    <span class="source-badge badge-pupha">📚 PUPHA törzs</span>
                 </div>
-                <span class="source-badge badge-pupha">📚 PUPHA törzs</span>
-            </div>
-        `;
+            `;
+        }
     });
 
     html += '</div>';
