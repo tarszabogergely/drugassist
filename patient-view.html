@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrugAssist – Beteg Terápiás Lap (Megtekintés)</title>
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f8fafc;
+}
+
+header {
+    background: white;
+    padding: 18px 32px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 22px;
+    color: #1e293b;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 32px;
+}
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.05);
+    border: 1px solid #e2e8f0;
+}
+
+.patient-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.read-only-badge {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+}
+
+.patient-data {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    row-gap: 10px;
+    margin-top: 15px;
+    font-size: 15px;
+}
+
+.label { color: #64748b; font-weight: 600; }
+
+/* AUDIT SÁV (KI MIT KÉSZÍTETT) */
+.audit-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.audit-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+}
+
+.audit-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.audit-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* GYÓGYSZER TÁBLÁZAT */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th, td { padding: 12px 14px; text-align: left; font-size: 14px; }
+th { background-color: #f8fafc; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+
+.dose-cell {
+    text-align: center;
+    font-weight: bold;
+    color: #0f172a;
+}
+
+.batch-info {
+    font-size: 12px;
+    color: #1e293b;
+    background: #e2e8f0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.note-box {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #334155;
+    min-height: 50px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Beteg Terápiás Lap</h1>
+    <div class="header-right">
+        <div><a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-size:18px; font-weight:600;" title="Kezdőlap">🏠</a></div>
+        <div class="user-info">
+            <span id="userName">Betöltés...</span> | <span id="dateTime"></span>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+
+<!-- BETEG ADATOK -->
+<section class="card">
+    <div class="patient-name">
+        <span id="patientName">Beteg adatai...</span>
+        <span class="read-only-badge">🔒 Megtekintési Mód</span>
+    </div>
+    <div class="patient-data">
+        <div class="label">Azonosító (TAJ)</div>
+        <div id="patientTaj">-</div>
+        <div class="label">Születési dátum</div>
+        <div id="patientBirthDate">-</div>
+        <div class="label">Osztály</div>
+        <div id="patientWard">-</div>
+        <div class="label">Ágy / Szoba</div>
+        <div id="patientBed">-</div>
+        <div class="label">Készítési Azonosító</div>
+        <div id="preparationId" style="font-weight: bold; color: #1565c0;">-</div>
+    </div>
+</section>
+
+<!-- FOLYAMAT LOG & ELKÉSZÍTÉSI NÉVJEGYEK -->
+<section class="card">
+    <h3 style="margin-top:0; font-size:16px; color:#334155;">👥 Terápiás Kezelőcsapat (Ki mit rögzített)</h3>
+    <div class="audit-grid">
+        <div class="audit-card">
+            <div class="audit-title">1. Patikai Jóváhagyó</div>
+            <div class="audit-value" id="auditReviewedBy">Betöltés...</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-title">2. Tálcázó / Készítő</div>
+            <div class="audit-value" id="auditDispensedBy">Betöltés...</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-title">3. Ellenőrző Gyógyszerész</div>
+            <div class="audit-value" id="auditVerifiedBy">Betöltés...</div>
+        </div>
+    </div>
+</section>
+
+<!-- GYÓGYSZERELÉSI TÁBLÁZAT -->
+<section class="card">
+    <h3 style="margin-top:0; font-size:16px; color:#334155;">💊 Aktuális Gyógyszerelési Terápia & Adagolás</h3>
+    <div id="medicationTableContainer">
+        <p style="color:#64748b;">Tételek betöltése...</p>
+    </div>
+</section>
+
+<!-- MEGJEGYZÉS DOBOZ -->
+<div class="card">
+    <h3 style="margin:0 0 8px 0; font-size:16px; color:#334155;">📝 Patikai Utasítás / Megjegyzés</h3>
+    <div id="pharmacyNoteView" class="note-box">Nincs megjegyzés rögzítve.</div>
+</div>
+
+</div>
+
+<script>
+let currentPrescriptionId = null;
+
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1. AUTENTIKÁCIÓ ÉS USER BEÁLLÍTÁSA
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name || user.email;
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile && profile.full_name) {
+                document.getElementById("userName").innerText = profile.full_name;
+            }
+        } catch (e) {
+            console.error("Profil hiba:", e);
+        }
+    }
+
+    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE (A korábbi ward.html-re vagy dashboardra)
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        window.location.href = 'ward.html';
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get('patientId');
+    currentPrescriptionId = urlParams.get('prescriptionId');
+
+    if (patientId) {
+        await loadPatientAndPrescription(patientId, currentPrescriptionId);
+    }
+});
+
+async function loadPatientAndPrescription(patientId, prescriptionId) {
+    try {
+        // BETEG ADATAI
+        const { data: patient } = await window.supabaseClient
+            .from('patients')
+            .select('*')
+            .eq('id', patientId)
+            .single();
+
+        if (patient) {
+            document.getElementById("patientName").innerText = patient.name;
+            document.getElementById("patientTaj").innerText = patient.taj || '-';
+
+            if (patient.birth_date) {
+                const bDate = new Date(patient.birth_date);
+                const formattedDate = bDate.toLocaleDateString('hu-HU');
+                const today = new Date();
+                let age = today.getFullYear() - bDate.getFullYear();
+                const m = today.getMonth() - bDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
+                document.getElementById("patientBirthDate").innerText = `${formattedDate} (${age} év)`;
+            }
+
+            document.getElementById("patientWard").innerText = patient.department || '-';
+            document.getElementById("patientBed").innerText = patient.room_bed || '-';
+        }
+
+        // LEKÉRDEZZÜK A PRESCRIPTION-T A TÉTELEKKEL ÉS A MASTER TÁBLÁKKAL
+        let query = window.supabaseClient
+            .from('prescriptions')
+            .select('*, prescription_items(*, pupha_master(*))')
+            .eq('patient_id', patientId);
+
+        if (prescriptionId) {
+            query = query.eq('id', prescriptionId);
+        } else {
+            query = query.order('created_at', { ascending: false }).limit(1);
+        }
+
+        const { data: pData } = await query;
+        const prescription = pData && pData.length > 0 ? pData[0] : null;
+
+        if (prescription) {
+            document.getElementById("preparationId").innerText = prescription.barcode || 'DA-20261009-0001';
+            document.getElementById("pharmacyNoteView").innerText = prescription.pharmacy_notes || 'Nincs rögzített megjegyzés.';
+
+            // KEZELŐCSAPAT AUDIT PROFILOK LEKÉRDEZÉSE
+            await loadAuditProfiles(prescription);
+
+            // TÁBLÁZAT RENDERELÉS
+            renderMedicationTable(prescription.prescription_items || []);
+        }
+
+    } catch (err) {
+        console.error("Betöltési hiba:", err);
+    }
+}
+
+async function loadAuditProfiles(prescription) {
+    const userIds = [prescription.reviewed_by, prescription.dispensed_by, prescription.verified_by].filter(Boolean);
+    const profileMap = {};
+
+    if (userIds.length > 0) {
+        const { data: profiles } = await window.supabaseClient
+            .from('profiles')
+            .select('*')
+            .in('id', userIds);
+
+        if (profiles) {
+            profiles.forEach(p => profileMap[p.id] = p.full_name || p.email);
+        }
+    }
+
+    document.getElementById("auditReviewedBy").innerText = prescription.reviewed_by ? (profileMap[prescription.reviewed_by] || 'Dr. Tarszabó Gergely') : '— Nem történt meg';
+    document.getElementById("auditDispensedBy").innerText = prescription.dispensed_by ? (profileMap[prescription.dispensed_by] || 'Gyógyszertári Asszisztens') : '— Folyamatban';
+    document.getElementById("auditVerifiedBy").innerText = prescription.verified_by ? (profileMap[prescription.verified_by] || 'Dr. Tarszabó Gergely') : '— Várakozik';
+}
+
+function renderMedicationTable(items) {
+    const container = document.getElementById("medicationTableContainer");
+    if (!items || items.length === 0) {
+        container.innerHTML = '<p style="color:#64748b;">Nincsenek aktív tételek rögzítve.</p>';
+        return;
+    }
+
+    let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Gyógyszer Neve</th>
+                    <th>Hatóanyag</th>
+                    <th style="text-align:center;">Reggel</th>
+                    <th style="text-align:center;">Délben</th>
+                    <th style="text-align:center;">Este</th>
+                    <th style="text-align:center;">Éjjel</th>
+                    <th style="text-align:center;">Gyári szám (LOT) / Lejárat (EXP)</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    items.forEach(item => {
+        const pupha = item.pupha_master;
+        const displayBrandName = item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen');
+        const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
+        const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
+        const isOwn = !!(item.is_patient_brought || item.is_own_medication);
+
+        const lot = item.batch_number || '-';
+        const exp = item.expiration_date || '-';
+
+        const batchStr = (lot !== '-' || exp !== '-') 
+            ? `<span class="batch-info">LOT: ${lot} | EXP: ${exp}</span>`
+            : '<span style="color:#94a3b8; font-size:12px;">Nincs rögzítve</span>';
+
+        html += `
+            <tr>
+                <td>
+                    <strong style="color:#1e293b; font-size:15px;">${displayBrandName}</strong>
+                    ${originalBrandName ? `<div style="font-size:12px; color:#1565c0; margin-top:2px;">Helyettesítve erről: <i>${originalBrandName}</i></div>` : ''}
+                    ${isOwn ? `<div style="font-size:12px; color:#475569; margin-top:2px; font-weight:bold;">🏠 Saját hozott gyógyszer</div>` : ''}
+                </td>
+                <td style="color:#475569; font-size:13px;">${ingredient}</td>
+                <td class="dose-cell">${item.dose_morning || 0}</td>
+                <td class="dose-cell">${item.dose_noon || 0}</td>
+                <td class="dose-cell">${item.dose_evening || 0}</td>
+                <td class="dose-cell">${item.dose_night || 0}</td>
+                <td style="text-align:center;">${batchStr}</td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
+}
+updateDateTime();
+setInterval(updateDateTime, 10000);
+</script>
+
+</body>
+</html>
