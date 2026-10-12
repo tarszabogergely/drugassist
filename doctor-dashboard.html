@@ -401,22 +401,28 @@ async function loadDepartmentPatients() {
 
         loadedPatients = patients;
 
-        // 2. Lépés: Mai napra vonatkozó igénylések lekérése Supabase-ből
-        const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00.000Z';
+        // 2. Lépés: Mai nap kezdetének kiszámítása a helyi időzóna alapján
+        const now = new Date();
+        const localTodayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
+        
         const patientIds = patients.map(p => p.id);
 
         todaysPrescriptionsMap = {};
         if (patientIds.length > 0) {
-            const { data: prescriptions } = await window.supabaseClient
+            const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
                 .select('*')
                 .in('patient_id', patientIds)
-                .gte('created_at', todayStart)
+                .gte('created_at', localTodayStart)
                 .order('created_at', { ascending: false });
+
+            if (prescErr) {
+                console.error("Prescriptions lekérdezési hiba:", prescErr);
+            }
 
             if (prescriptions) {
                 prescriptions.forEach(p => {
-                    // Mivel időrendben csökkenő, a legfrissebb kerül be
+                    // Legfrissebb igénylés hozzárendelése a beteghez
                     if (!todaysPrescriptionsMap[p.patient_id]) {
                         todaysPrescriptionsMap[p.patient_id] = p;
                     }
