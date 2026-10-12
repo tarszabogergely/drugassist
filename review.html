@@ -34,7 +34,7 @@ header {
 header h1 {
     margin: 0;
     font-size: 22px;
-    color: #1e293b; /* Vagy #000000 feketéhez */
+    color: #1e293b;
 }
 
 .header-right {
@@ -610,11 +610,13 @@ async function confirmReviewWithBarcode() {
     try {
         const user = Auth.getCurrentUser();
         
+        // Csatoljuk az updated_at mezőt a pontos mai nap rögzítéséhez
         const { error } = await window.supabaseClient
             .from('prescriptions')
             .update({
                 status: 'completed',
-                verified_by: user ? user.id : null
+                verified_by: user ? user.id : null,
+                updated_at: new Date().toISOString()
             })
             .eq('id', currentPrescriptionId);
 
@@ -624,7 +626,7 @@ async function confirmReviewWithBarcode() {
             return;
         }
 
-        // Felugró ablak nélkül, azonnali átirányítás a completed-list.html-re
+        // Sikeres lezárás után azonnali átirányítás
         closeBarcodeModal();
         window.location.href = 'completed-list.html';
 
