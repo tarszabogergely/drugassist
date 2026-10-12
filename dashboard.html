@@ -118,7 +118,6 @@ header h1 {
 
 .status-title { font-size: 15px; font-weight: 600; color: #475569; }
 .status-number { font-size: 38px; font-weight: 700; text-align: right; color: #0f172a; }
-.status-sub { font-size: 12px; color: #64748b; text-align: right; }
 
 .orange { border-left: 6px solid #ff9800; }
 .blue { border-left: 6px solid #2196f3; }
@@ -234,7 +233,7 @@ header h1 {
 <header>
     <h1>DrugAssist</h1>
     <div class="header-right">
-        <span id="userName" class="user-name">Kovács Anna</span>
+        <span id="userName" class="user-name">Munkatárs</span>
         
         <!-- SZEREPKÖR VÁLASZTÓ -->
         <select id="roleSelector" class="badge-select" onchange="changeRole(this.value)">
@@ -265,22 +264,22 @@ header h1 {
 <div class="status-grid">
     <div class="status-card orange" onclick="location.href='approval-list.html'">
         <div class="status-title">Jóváhagyásra vár</div>
-        <div><div id="cntSubmitted" class="status-number">0</div><div class="status-sub">igénylés (mai)</div></div>
+        <div id="cntSubmitted" class="status-number">0</div>
     </div>
 
     <div class="status-card blue" onclick="location.href='medication-list.html'">
         <div class="status-title">Gyógyszerelésre vár</div>
-        <div><div id="cntReviewed" class="status-number">0</div><div class="status-sub">igénylés (mai)</div></div>
+        <div id="cntReviewed" class="status-number">0</div>
     </div>
 
     <div class="status-card green" onclick="location.href='verification-list.html'">
         <div class="status-title">Ellenőrzésre vár</div>
-        <div><div id="cntDispensed" class="status-number">0</div><div class="status-sub">igénylés (mai)</div></div>
+        <div id="cntDispensed" class="status-number">0</div>
     </div>
 
     <div class="status-card gray" onclick="location.href='completed-list.html'">
         <div class="status-title">Kész</div>
-        <div><div id="cntCompleted" class="status-number">0</div><div class="status-sub">igénylés (mai)</div></div>
+        <div id="cntCompleted" class="status-number">0</div>
     </div>
 </div>
 
@@ -313,16 +312,42 @@ header h1 {
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const user = Auth.requireAuth();
     if (user) {
+        // Név beállítása
         document.getElementById("userName").innerText = user.name || user.email;
-        
-        const roleSel = document.getElementById("roleSelector");
-        if (roleSel) roleSel.value = user.activeRole || 'pharmacist';
 
-        const deptSel = document.getElementById("deptSelector");
-        if (deptSel) deptSel.value = user.activeDepartment || 'Belgyógyászat';
+        // FELHASZNÁLÓI PROFIL LEKÉRDEZÉSE A SUPABASE-BŐL A FEJLÉC FIXÁLÁSÁHOZ
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('*')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile) {
+                if (profile.full_name) {
+                    document.getElementById("userName").innerText = profile.full_name;
+                }
+                const roleSel = document.getElementById("roleSelector");
+                if (roleSel && profile.role) {
+                    roleSel.value = profile.role;
+                }
+                const deptSel = document.getElementById("deptSelector");
+                if (deptSel && profile.department) {
+                    deptSel.value = profile.department;
+                }
+            } else {
+                const roleSel = document.getElementById("roleSelector");
+                if (roleSel) roleSel.value = user.activeRole || 'pharmacist';
+
+                const deptSel = document.getElementById("deptSelector");
+                if (deptSel) deptSel.value = user.activeDepartment || 'Belgyógyászat';
+            }
+        } catch (e) {
+            console.error("Profil betöltési hiba:", e);
+        }
 
         loadDashboardData();
     }
@@ -380,7 +405,6 @@ async function loadDashboardData() {
                 else if (p.status === 'dispensed') cntDispensed++;
                 else if (p.status === 'completed') cntCompleted++;
 
-                // Beteghez tartozó legfrissebb mai igénylés eltárolása
                 if (!patientTodayPrescMap[p.patient_id]) {
                     patientTodayPrescMap[p.patient_id] = p.status;
                 }
