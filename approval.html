@@ -138,6 +138,14 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
     transition: 0.2s;
 }
 
+/* SAJÁT HOZOTT GYÓGYSZER SOR STÍLUS */
+.row-own-med {
+    background-color: #f1f5f9 !important; /* Szürke */
+    color: #64748b;
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
 .row-in-stock:hover, .row-out-of-stock:hover { filter: brightness(0.96); }
 
 .dose-cell {
@@ -236,9 +244,16 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: background 0.15s;
 }
 
 .local-drug-item:hover { background: #f0f7ff; }
+
+/* KIVÁLASZTOTT HELYETTESÍTŐ ELEM STÍLUSA */
+.local-drug-item.selected-substitute {
+    background-color: #e8f5e9 !important;
+    border-left: 4px solid #2e7d32;
+}
 
 .dose-edit-grid {
     display: grid;
@@ -388,6 +403,7 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
 let currentPrescriptionId = null;
 let prescriptionItems = [];
 let localInventory = [];
+let dbInteractions = [];
 let selectedItemIndex = null;
 let activeTab = 'atc';
 let isWarningsApproved = false;
@@ -395,6 +411,7 @@ let isWarningsApproved = false;
 document.addEventListener("DOMContentLoaded", async () => {
     Auth.requireAuth();
     await loadLocalInventory();
+    await loadInteractionsMaster();
 
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('patientId');
@@ -414,6 +431,20 @@ async function loadLocalInventory() {
         localInventory = data || [];
     } catch (e) {
         console.error("Hiba a helyi készlet betöltésekor:", e);
+    }
+}
+
+// 2. INTERAKCIÓK TÖRZSTÁBLÁJÁNAK LEKÉRDEZÉSE A SUPABASE-BŐL
+async function loadInteractionsMaster() {
+    try {
+        const { data, error } = await window.supabaseClient
+            .from('interactions')
+            .select('*');
+        if (!error && data) {
+            dbInteractions = data;
+        }
+    } catch (e) {
+        console.error("Interakciók adatbázis betöltési hiba:", e);
     }
 }
 
@@ -468,7 +499,7 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientNote").value = prescription.pharmacy_notes || '';
             prescriptionItems = prescription.prescription_items || [];
             
-            checkWarnings(prescriptionItems);
+            await checkWarnings(prescriptionItems);
             renderMedicationTable();
         }
     } catch (err) {
@@ -476,22 +507,59 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
     }
 }
 
-function checkWarnings(items) {
+// KÖLCSÖNHATÁSOK ÉS FIGYELMEZTETÉSEK BIZTONSÁGI ELLENŐRZÉSE
+async function checkWarnings(items) {
     const alertBox = document.getElementById("alertBox");
     const warningsList = document.getElementById("warningsList");
     let warnings = [];
 
-    const ingredients = items.map(i => i.pupha_master ? i.pupha_master.active_ingredient : '').filter(Boolean);
-    const duplicates = ingredients.filter((item, index) => ingredients.indexOf(item) !== index);
+    // Hatóanyagok kigyűjtése
+    const activeIngredients = items.map(i => {
+        const ingredient = i.substituted_ingredient || (i.pupha_master ? i.pupha_master.active_ingredient : '');
+        return {
+            item: i,
+            ingredient: ingredient.toLowerCase().trim()
+        };
+    }).filter(x => x.ingredient);
 
+    // A) HATÓANYAG DUPLIKÁCIÓ SZŰRÉS
+    const ingList = activeIngredients.map(a => a.ingredient);
+    const duplicates = ingList.filter((item, index) => ingList.indexOf(item) !== index);
     if (duplicates.length > 0) {
-        warnings.push(`⚠️ <strong>Duplikált hatóanyag a terápiában:</strong> ${duplicates.join(', ')}`);
+        warnings.push(`⚠️ <strong>Duplikált hatóanyag a terápiában:</strong> ${[...new Set(duplicates)].join(', ')}`);
     }
 
+    // B) SUPABASE KÖLCSÖNHATÁS (INTERACTIONS) LEKÉRDEZÉS
+    for (let i = 0; i < activeIngredients.length; i++) {
+        for (let j = i + 1; j < activeIngredients.length; j++) {
+            const ingA = activeIngredients[i].ingredient;
+            const ingB = activeIngredients[j].ingredient;
+
+            // Kétirányú keresés a betöltött adatbázis mátrixban
+            const match = dbInteractions.find(inter => {
+                const dbA = (inter.ingredient_a || '').toLowerCase().trim();
+                const dbB = (inter.ingredient_b || '').toLowerCase().trim();
+                return (dbA === ingA && dbB === ingB) || (dbA === ingB && dbB === ingA);
+            });
+
+            if (match) {
+                const sevBadge = match.severity === 'major' 
+                    ? '<span style="color:#c62828; font-weight:bold;">[SÚLYOS KÖLCSÖNHATÁS]</span>' 
+                    : '<span style="color:#e65100; font-weight:bold;">[MÉRSÉKELT KÖLCSÖNHATÁS]</span>';
+                
+                warnings.push(`💥 ${sevBadge} <strong>${ingA.toUpperCase()} ↔ ${ingB.toUpperCase()}:</strong> ${match.description || 'Fokozott klinikai odafigyelést igénylő kombináció!'}`);
+            }
+        }
+    }
+
+    // C) KÉSZLETHIÁNY SZŰRÉS (CSAK A NEM SAJÁT GYÓGYSZEREKNÉL)
     const missingCount = items.filter(item => {
+        if (item.is_own_medication) return false;
         const pupha = item.pupha_master;
-        if (!pupha) return true;
-        return !localInventory.some(l => l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name);
+        return !localInventory.some(l => 
+            (item.substituted_name && l.brand_name === item.substituted_name) ||
+            (pupha && (l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name))
+        );
     }).length;
 
     if (missingCount > 0) {
@@ -553,18 +621,23 @@ function renderMedicationTable() {
         const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
         const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
 
-        const isInStock = localInventory.some(l => 
+        const isOwn = !!item.is_own_medication;
+
+        const isInStock = isOwn || localInventory.some(l => 
             (item.substituted_name && l.brand_name === item.substituted_name) ||
             (pupha && (l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name))
         );
 
-        const rowClass = isInStock ? 'row-in-stock' : 'row-out-of-stock';
+        // SAJÁT GYÓGYSZER SOR BEÁLLÍTÁSA
+        let rowClass = isOwn ? 'row-own-med' : (isInStock ? 'row-in-stock' : 'row-out-of-stock');
+        let clickAttr = isOwn ? '' : `onclick="openSubstituteModal(${idx})"`;
 
         html += `
-            <tr class="${rowClass}" onclick="openSubstituteModal(${idx})">
+            <tr class="${rowClass}" ${clickAttr}>
                 <td>
                     <strong style="color:#1e293b; font-size:15px;">${displayBrandName}</strong>
                     ${originalBrandName ? `<div style="font-size:12px; color:#1565c0; margin-top:2px;">Helyettesítve erről: <i>${originalBrandName}</i></div>` : ''}
+                    ${isOwn ? `<div style="font-size:12px; color:#475569; margin-top:2px; font-weight:bold;">🏠 Saját hozott gyógyszer (Nem szerkeszthető)</div>` : ''}
                 </td>
                 <td style="color:#475569; font-size:13px;">${ingredient}</td>
                 <td class="dose-cell">${item.dose_morning || 0}</td>
@@ -572,9 +645,11 @@ function renderMedicationTable() {
                 <td class="dose-cell">${item.dose_evening || 0}</td>
                 <td class="dose-cell">${item.dose_night || 0}</td>
                 <td style="text-align:center;">
-                    ${isInStock 
-                        ? '<span style="color:#2e7d32; font-weight:700; font-size:12px;">✓ Készleten</span>' 
-                        : '<span style="color:#c62828; font-weight:700; font-size:12px;">✖ Hiánycikk</span>'}
+                    ${isOwn 
+                        ? '<span style="color:#475569; font-weight:700; font-size:12px;">🏠 Hozott</span>'
+                        : (isInStock 
+                            ? '<span style="color:#2e7d32; font-weight:700; font-size:12px;">✓ Készleten</span>' 
+                            : '<span style="color:#c62828; font-weight:700; font-size:12px;">✖ Hiánycikk</span>')}
                 </td>
             </tr>
         `;
@@ -585,8 +660,10 @@ function renderMedicationTable() {
 }
 
 function openSubstituteModal(index) {
-    selectedItemIndex = index;
     const item = prescriptionItems[index];
+    if (item.is_own_medication) return; // SAJÁT GYÓGYSZER NEM HELYETTESÍTHETŐ
+
+    selectedItemIndex = index;
 
     document.getElementById("modalTitle").innerText = `${item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer'} Helyettesítése`;
     document.getElementById("editMorning").value = item.dose_morning || 0;
@@ -632,13 +709,19 @@ function filterLocalList(searchTerm) {
 
     let html = '';
     filtered.forEach(drug => {
+        // ELLENŐRIZZÜK, HOGY EZ A DRUG VAN-E JELENLEG KIVÁLASZTVA
+        const isSelected = item && (item.substituted_name === drug.brand_name || (item.local_drug_id === drug.id));
+        const itemClass = `local-drug-item ${isSelected ? 'selected-substitute' : ''}`;
+
         html += `
-            <div class="local-drug-item" onclick="selectSubstitutedDrug('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${drug.active_ingredient.replace(/'/g, "\\'")}')">
+            <div class="${itemClass}" onclick="selectSubstitutedDrug('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${drug.active_ingredient.replace(/'/g, "\\'")}')">
                 <div>
                     <strong style="color:#1e293b;">${drug.brand_name}</strong>
                     <div style="font-size:12px; color:#64748b;">Hatóanyag: ${drug.active_ingredient} | ATC: ${drug.atc_code}</div>
                 </div>
-                <button style="font-size:12px; padding:4px 10px;">Kiválasztás</button>
+                <button style="font-size:12px; padding:4px 10px; ${isSelected ? 'background:#2e7d32;' : ''}">
+                    ${isSelected ? '✓ Kiválasztva' : 'Kiválasztás'}
+                </button>
             </div>
         `;
     });
@@ -646,14 +729,17 @@ function filterLocalList(searchTerm) {
     listContainer.innerHTML = html;
 }
 
+// FELUGRÓ ABLAK NÉLKÜLI KIVÁLASZTÁS A MODALBAN
 function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
     const item = prescriptionItems[selectedItemIndex];
     if (item) {
-        // Ha van localDrugId, elmentjük, egyébként null
         item.local_drug_id = localDrugId || null;
         item.substituted_name = newBrandName;
         item.substituted_ingredient = newIngredient;
-        alert(`Helyettesítve erre: ${newBrandName}`);
+        
+        // ÚJRARENDERELJÜK A MODAL LISTÁT A ZÖLD HÁTTÉRSZÍN KIEMELÉSHEZ
+        const searchVal = document.getElementById("modalSearchInput").value;
+        filterLocalList(searchVal);
     }
 }
 
@@ -696,7 +782,6 @@ async function approvePrescription() {
                 dose_night: parseFloat(item.dose_night) || 0
             };
 
-            // Csak akkor küldjük a local_drug_id-t, ha létezik
             if (item.local_drug_id) {
                 updatePayload.local_drug_id = item.local_drug_id;
             }
@@ -708,7 +793,7 @@ async function approvePrescription() {
 
             if (itemErr) {
                 console.error("Tétel mentési hiba:", itemErr);
-                alert(`Hiba a(z) ${item.substituted_name || 'gyógyszer'} mentésekor:\n${itemErr.message} (Kód: ${itemErr.code})`);
+                alert(`Hiba a(z) ${item.substituted_name || 'gyógyszer'} mentésekor:\n${itemErr.message}`);
                 return;
             }
         }
@@ -725,7 +810,6 @@ async function approvePrescription() {
 
         if (prescErr) throw prescErr;
 
-        alert("Gyógyszerelés és helyettesítések sikeresen jóváhagyva és elmentve!");
         window.location.href = 'approval-list.html';
 
     } catch (e) {
@@ -733,7 +817,7 @@ async function approvePrescription() {
         alert(`Hiba történt a mentés során: ${e.message || e}`);
     }
 }
-    
+
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
