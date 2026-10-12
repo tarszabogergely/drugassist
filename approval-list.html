@@ -37,6 +37,12 @@ h1 {
     gap: 15px;
 }
 
+.user-info {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 600;
+}
+
 .container {
     padding: 30px;
 }
@@ -129,8 +135,28 @@ tr:hover {
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-    Auth.requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+    // 1. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓNÉV KIJELZÉSE
+    const user = Auth.requireAuth();
+    if (user) {
+        document.getElementById("userName").innerText = user.name || user.email;
+
+        // Felhasználói profil név kiolvasása a Supabase-ből
+        try {
+            const { data: profile } = await window.supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+                .maybeSingle();
+
+            if (profile && profile.full_name) {
+                document.getElementById("userName").innerText = profile.full_name;
+            }
+        } catch (e) {
+            console.error("Profil név betöltési hiba:", e);
+        }
+    }
+
     loadApprovalList();
 });
 
