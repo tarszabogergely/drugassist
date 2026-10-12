@@ -298,7 +298,7 @@ async function loadWardPatients() {
             const presc = latestPrescriptionMap[patient.id];
             let statusText = 'Nincs feladva';
             let dotClass = 'gray';
-            let targetUrl = `prescription.html?patientId=${patient.id}`;
+            let targetUrl = `patient-view.html?patientId=${patient.id}`;
 
             if (presc) {
                 if (presc.status === 'submitted') {
