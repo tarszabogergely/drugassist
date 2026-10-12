@@ -361,7 +361,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadDashboardData() {
     try {
         const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
+        // Mai nap helyi YYYY-MM-DD formátumban (pl. "2026-10-12")
+        const todayStr = now.toLocaleDateString('sv-SE'); 
 
         // 1. ÖSSZES IGÉNYLÉS LEKÉRDEZÉSE
         const { data: allPrescriptions, error: allPErr } = await window.supabaseClient
@@ -383,18 +384,26 @@ async function loadDashboardData() {
                 if (p.status === 'submitted') cntSubmitted++;
                 else if (p.status === 'reviewed') cntReviewed++;
                 else if (p.status === 'dispensed') cntDispensed++;
-                // A "Kész" (completed) számláló KIZÁRÓLAG a mai napon frissült/lezárt tételeket mutatja
+                
+                // A "Kész" (completed) számláló KIZÁRÓLAG a MAI NAPON lezárt tételeket mutatja
                 else if (p.status === 'completed') {
-                    const checkDate = p.updated_at || p.created_at;
-                    if (checkDate && checkDate >= startOfToday) {
-                        cntCompleted++;
+                    // Megnézzük a frissítés vagy a létrehozás dátumát YYYY-MM-DD formátumban
+                    const lastDateRaw = p.updated_at || p.created_at;
+                    if (lastDateRaw) {
+                        const itemDateStr = new Date(lastDateRaw).toLocaleDateString('sv-SE');
+                        if (itemDateStr === todayStr) {
+                            cntCompleted++;
+                        }
                     }
                 }
 
                 // Osztályos blokkhoz a mai napon létrehozott igényléseket gyűjtjük
-                if (p.created_at && p.created_at >= startOfToday) {
-                    if (!patientTodayPrescMap[p.patient_id]) {
-                        patientTodayPrescMap[p.patient_id] = p.status;
+                if (p.created_at) {
+                    const createdStr = new Date(p.created_at).toLocaleDateString('sv-SE');
+                    if (createdStr === todayStr) {
+                        if (!patientTodayPrescMap[p.patient_id]) {
+                            patientTodayPrescMap[p.patient_id] = p.status;
+                        }
                     }
                 }
             });
@@ -404,7 +413,7 @@ async function loadDashboardData() {
         document.getElementById("cntReviewed").innerText = cntReviewed;
         document.getElementById("cntDispensed").innerText = cntDispensed;
         document.getElementById("cntCompleted").innerText = cntCompleted;
-
+        
         // 2. AKTÍV BETEGEK LEKÉRDEZÉSE AZ OSZTÁLYOS KÁRTYÁKHOZ
         const { data: activePatients, error: patErr } = await window.supabaseClient
             .from('patients')
