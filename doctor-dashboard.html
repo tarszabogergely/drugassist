@@ -447,13 +447,13 @@ function renderPatientTable(patients) {
         const age = calculateAge(p.birth_date);
         const ageStr = age !== null ? ` (${age} év)` : '';
 
-        // Beteg azonosító biztos sztringgé alakítása a lekérdezéshez
+        // Beteg azonosító biztos sztringgé alakítása
         const presc = todaysPrescriptionsMap[String(p.id)];
         let statusBadge = '<span class="status-badge status-none">Nincs feladva</span>';
 
         if (presc) {
             const st = presc.status;
-            if (st === 'pending' || st === 'draft') {
+            if (st === 'pending' || st === 'submitted' || st === 'draft') {
                 statusBadge = '<span class="status-badge status-pending">🟠 Jóváhagyásra vár</span>';
             } else if (st === 'reviewed') {
                 statusBadge = '<span class="status-badge status-reviewed">🔵 Jóváhagyva (Patikában)</span>';
@@ -462,7 +462,7 @@ function renderPatientTable(patients) {
             } else if (st === 'completed') {
                 statusBadge = '<span class="status-badge status-completed">🟢 Elkészült & Ellenőrizve</span>';
             } else {
-                statusBadge = `<span class="status-badge status-pending">${st}</span>`;
+                statusBadge = `<span class="status-badge status-pending">🟠 ${st}</span>`;
             }
         }
 
