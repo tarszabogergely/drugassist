@@ -1,192 +1,257 @@
-/**
- * DrugAssist - Orvos / Ápoló Gyógyszerigénylő Modul
- * Fájl: js/prescription.js
- */
-
 const Prescription = {
-    currentPatientId: null,
+    currentPatient: null,
     currentPrescriptionId: null,
-    items: [],
+    currentPrescriptionStatus: null,
+    orderItems: [], // A felületen lévő tételek
 
-    // 1. Beteg adatainak és meglévő/tegnapi igénylésének betöltése
-    async loadPatientOrder(patientId) {
-        this.currentPatientId = patientId;
-        this.items = [];
+    // Életkor kiszámítása
+    calculateAge: function(birthDateStr) {
+        if (!birthDateStr) return null;
+        const bDate = new Date(birthDateStr);
+        if (isNaN(bDate)) return null;
+        const today = new Date();
+        let age = today.getFullYear() - bDate.getFullYear();
+        const m = today.getMonth() - bDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
+        return age;
+    },
 
+    // Beteg és legfrissebb igénylés betöltése
+    loadPatientOrder: async function(patientId) {
         try {
-            // Beteg adatai
-            const { data: patient } = await window.supabaseClient
+            // 1. Beteg adatainak betöltése
+            const { data: patient, error: patErr } = await window.supabaseClient
                 .from('patients')
                 .select('*')
                 .eq('id', patientId)
                 .single();
 
-            if (patient) {
-                document.getElementById('patientName').innerText = patient.name;
-                document.getElementById('patientInfo').innerText = `TAJ: ${patient.taj} | Ágy: ${patient.room_bed}`;
+            if (patErr || !patient) {
+                alert("Hiba a beteg adatai betöltésekor!");
+                return;
             }
 
-            // Mai aktív igénylés keresése
-            const todayStr = new Date().toISOString().split('T')[0];
-            const { data: todayPrescription } = await window.supabaseClient
+            this.currentPatient = patient;
+            document.getElementById("patientName").innerText = patient.name;
+            
+            const birthDateStr = patient.birth_date ? new Date(patient.birth_date).toLocaleDateString('hu-HU') : '-';
+            const age = this.calculateAge(patient.birth_date);
+            const ageStr = age !== null ? ` (${age} év)` : '';
+            
+            document.getElementById("patientInfo").innerText = `TAJ: ${patient.taj || '-'} | Születési dátum: ${birthDateStr}${ageStr} | Ágy: ${patient.room_bed || '-'}`;
+
+            // 2. Mai napra vonatkozó igénylés lekérése
+            const now = new Date();
+            const localTodayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
+
+            const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
                 .select('*, prescription_items(*, pupha_master(*))')
                 .eq('patient_id', patientId)
-                .gte('created_at', todayStr)
-                .single();
+                .gte('created_at', localTodayStart)
+                .order('created_at', { ascending: false });
 
-            if (todayPrescription) {
-                this.currentPrescriptionId = todayPrescription.id;
-                this.items = todayPrescription.prescription_items.map(item => ({
-                    id: item.id,
-                    pupha_id: item.pupha_drug_id,
-                    name: item.pupha_master ? item.pupha_master.brand_name : 'Ismeretlen gyógyszer',
-                    atc: item.pupha_master ? item.pupha_master.atc_code : '',
-                    morning: item.dose_morning || 0,
-                    noon: item.dose_noon || 0,
-                    evening: item.dose_evening || 0,
-                    night: item.dose_night || 0,
-                    isOwn: item.is_own_medication || false,
-                    originalOrder: item.original_order_text || ''
-                }));
+            const existingPrescription = (prescriptions && prescriptions.length > 0) ? prescriptions[0] : null;
+
+            if (existingPrescription) {
+                this.currentPrescriptionId = existingPrescription.id;
+                this.currentPrescriptionStatus = existingPrescription.status;
+
+                // Meglévő tételek betöltése a tömbbe
+                this.orderItems = (existingPrescription.prescription_items || []).map(item => {
+                    const pupha = item.pupha_master;
+                    return {
+                        id: item.id,
+                        pupha_id: item.pupha_id,
+                        brand_name: item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen'),
+                        active_ingredient: item.substituted_ingredient || (pupha ? pupha.active_ingredient : ''),
+                        dose_morning: item.dose_morning || 0,
+                        dose_noon: item.dose_noon || 0,
+                        dose_evening: item.dose_evening || 0,
+                        dose_night: item.dose_night || 0,
+                        is_patient_brought: item.is_patient_brought || false
+                    };
+                });
+
+                // Státusz ellenőrzés
+                const st = existingPrescription.status;
+                if (st === 'reviewed' || st === 'dispensed' || st === 'completed') {
+                    // Zárolt állapot
+                    this.lockForm();
+                } else {
+                    // Szerkeszthető módosítás
+                    this.setEditMode();
+                }
+
+            } else {
+                // Nincs mai igénylés -> Új igénylés mód
+                this.currentPrescriptionId = null;
+                this.currentPrescriptionStatus = null;
+                this.orderItems = [];
+                this.setCreateMode();
             }
-            
-            this.renderTable();
 
-        } catch (err) {
-            console.error("Hiba a beteg igénylésének betöltésekor:", err);
+            this.renderOrderTable();
+
+        } catch (e) {
+            console.error("Hiba az igénylés betöltésekor:", e);
         }
     },
 
-    // 2. Tegnapi patika által jóváhagyott terápia másolása (SQL tárolt eljárás hívása)
-    async copyPreviousDay() {
-        const user = Auth.getCurrentUser();
-        if (!user || !this.currentPatientId) return;
-
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        try {
-            const { data: newPrescriptionId, error } = await window.supabaseClient.rpc('copy_previous_approved_prescription', {
-                p_patient_id: this.currentPatientId,
-                p_target_date: todayStr,
-                p_user_id: user.id
-            });
-
-            if (error) {
-                alert("Nincs korábbi jóváhagyott gyógyszerelés, amit át lehetne másolni.");
-                return;
-            }
-
-            alert("Előző napi jóváhagyott terápia sikeresen betöltve!");
-            await this.loadPatientOrder(this.currentPatientId);
-
-        } catch (err) {
-            console.error("Hiba a másolás során:", err);
+    setCreateMode: function() {
+        const submitBtn = document.getElementById("submitBtn");
+        if (submitBtn) {
+            submitBtn.innerText = "🚀 Gyógyszerigénylés feladása a Patikának";
+            submitBtn.disabled = false;
         }
+        document.getElementById("lockBanner").style.display = "none";
+        this.enableInputs(true);
     },
 
-    // 3. Intelligens PuPha Kereső (3 karakter felett)
-    async searchPupha(searchTerm) {
-        const dropdown = document.getElementById('puphaSearchResults');
-        if (!searchTerm || searchTerm.length < 3) {
-            dropdown.style.display = 'none';
+    setEditMode: function() {
+        const submitBtn = document.getElementById("submitBtn");
+        if (submitBtn) {
+            submitBtn.innerText = "✏️ Mai igénylés módosítása";
+            submitBtn.disabled = false;
+        }
+        document.getElementById("lockBanner").style.display = "none";
+        this.enableInputs(true);
+    },
+
+    lockForm: function() {
+        const submitBtn = document.getElementById("submitBtn");
+        if (submitBtn) {
+            submitBtn.innerText = "🔒 A rendelés le van zárva";
+            submitBtn.disabled = true;
+        }
+        document.getElementById("lockBanner").style.display = "block";
+        document.getElementById("copyPrevBtn").disabled = true;
+        document.getElementById("puphaSearchInput").disabled = true;
+        this.enableInputs(false);
+    },
+
+    enableInputs: function(enabled) {
+        const inputs = document.querySelectorAll("#prescriptionTableBody input");
+        inputs.forEach(i => i.disabled = !enabled);
+        const btns = document.querySelectorAll("#prescriptionTableBody button");
+        btns.forEach(b => b.disabled = !enabled);
+    },
+
+    // PuPha Törzs Kereső
+    searchPupha: async function(term) {
+        const resultsDiv = document.getElementById("puphaSearchResults");
+        if (!term || term.length < 3) {
+            resultsDiv.style.display = "none";
             return;
         }
 
         try {
-            const { data: results, error } = await window.supabaseClient
+            const { data, error } = await window.supabaseClient
                 .from('pupha_master')
-                .select('id, brand_name, active_ingredient, atc_code, package_size')
-                .or(`brand_name.ilike.%${searchTerm}%,active_ingredient.ilike.%${searchTerm}%,atc_code.ilike.%${searchTerm}%`)
+                .select('*')
+                .or(`brand_name.ilike.%${term}%,active_ingredient.ilike.%${term}%`)
                 .limit(10);
 
-            if (error || !results || results.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-item empty">Nincs találat</div>';
-                dropdown.style.display = 'block';
-                return;
+            if (error || !data || data.length === 0) {
+                resultsDiv.innerHTML = '<div class="dropdown-item" style="color:#64748b;">Nincs találat.</div>';
+            } else {
+                let html = '';
+                data.forEach(item => {
+                    html += `
+                        <div class="dropdown-item" onclick="Prescription.addDrugFromSearch('${item.id}', '${item.brand_name.replace(/'/g, "\\'")}', '${(item.active_ingredient || '').replace(/'/g, "\\'")}')">
+                            <strong style="color:#1e293b;">${item.brand_name}</strong>
+                            <div class="sub-text">Hatóanyag: ${item.active_ingredient || '-'}</div>
+                        </div>
+                    `;
+                });
+                resultsDiv.innerHTML = html;
             }
+            resultsDiv.style.display = "block";
 
-            let html = '';
-            results.forEach(drug => {
-                html += `
-                    <div class="dropdown-item" onclick="Prescription.addDrugFromPupha('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${drug.atc_code}')">
-                        <strong>${drug.brand_name}</strong>
-                        <div class="sub-text">Hatóanyag: ${drug.active_ingredient || '-'} | ATC: ${drug.atc_code} | ${drug.package_size || ''}</div>
-                    </div>
-                `;
-            });
-
-            dropdown.innerHTML = html;
-            dropdown.style.display = 'block';
-
-        } catch (err) {
-            console.error("Keresési hiba:", err);
+        } catch (e) {
+            console.error("Keresési hiba:", e);
         }
     },
 
-    // 4. Gyógyszer hozzáadása a helyi táblázathoz
-    addDrugFromPupha(id, name, atc) {
-        document.getElementById('puphaSearchInput').value = '';
-        document.getElementById('puphaSearchResults').style.display = 'none';
+    addDrugFromSearch: function(puphaId, brandName, activeIngredient) {
+        document.getElementById("puphaSearchInput").value = '';
+        document.getElementById("puphaSearchResults").style.display = "none";
 
-        this.items.push({
-            pupha_id: id,
-            name: name,
-            atc: atc,
-            morning: 0,
-            noon: 0,
-            evening: 0,
-            night: 0,
-            isOwn: false,
-            originalOrder: `${name} (1-0-1-0)` // Alapértelmezett elrendelt szöveg rögzítése
-        });
-
-        this.renderTable();
-    },
-
-    // 5. Adagolás vagy státusz módosítása a táblázatban
-    updateItem(index, field, value) {
-        if (field === 'isOwn') {
-            this.items[index].isOwn = value;
-        } else {
-            this.items[index][field] = parseFloat(value) || 0;
-        }
-    },
-
-    // Tétel törlése
-    removeItem(index) {
-        this.items.splice(index, 1);
-        this.renderTable();
-    },
-
-    // 6. Táblázat kirajzolása (Auditing / Eredeti elrendelt utasítás megjelenítésével)
-    renderTable() {
-        const tbody = document.getElementById('prescriptionTableBody');
-        if (!tbody) return;
-
-        if (this.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Nincs rögzített gyógyszer. Használja a fenti keresőt!</td></tr>';
+        // Ellenőrizzük, szerepel-e már
+        const exists = this.orderItems.some(item => item.pupha_id === puphaId);
+        if (exists) {
+            alert("Ez a gyógyszer már szerepel a listán!");
             return;
         }
 
+        this.orderItems.push({
+            pupha_id: puphaId,
+            brand_name: brandName,
+            active_ingredient: activeIngredient,
+            dose_morning: 1,
+            dose_noon: 0,
+            dose_evening: 0,
+            dose_night: 0,
+            is_patient_brought: false
+        });
+
+        this.renderOrderTable();
+    },
+
+    removeDrug: function(index) {
+        if (this.currentPrescriptionStatus && ['reviewed', 'dispensed', 'completed'].includes(this.currentPrescriptionStatus)) return;
+        this.orderItems.splice(index, 1);
+        this.renderOrderTable();
+    },
+
+    updateDose: function(index, field, value) {
+        const val = parseFloat(value) || 0;
+        if (this.orderItems[index]) {
+            this.orderItems[index][field] = val;
+        }
+    },
+
+    togglePatientBrought: function(index, checked) {
+        if (this.orderItems[index]) {
+            this.orderItems[index].is_patient_brought = checked;
+        }
+    },
+
+    // Táblázat kirajzolása (3. és 4. pont javítása)
+    renderOrderTable: function() {
+        const tbody = document.getElementById("prescriptionTableBody");
+        if (!this.orderItems || this.orderItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#64748b; padding:20px;">Még nincs gyógyszer hozzáadva. Használja a fenti keresőt!</td></tr>';
+            return;
+        }
+
+        const isLocked = ['reviewed', 'dispensed', 'completed'].includes(this.currentPrescriptionStatus);
+
         let html = '';
-        this.items.forEach((item, idx) => {
+        this.orderItems.forEach((item, idx) => {
             html += `
                 <tr>
                     <td>
-                        <strong class="drug-title">${item.name}</strong>
-                        <div class="atc-badge">ATC: ${item.atc}</div>
-                        ${item.originalOrder ? `<div class="original-order-sub">📋 Eredetileg elrendelve: ${item.originalOrder}</div>` : ''}
-                    </td>
-                    <td><input type="number" step="0.5" min="0" value="${item.morning}" onchange="Prescription.updateItem(${idx}, 'morning', this.value)"></td>
-                    <td><input type="number" step="0.5" min="0" value="${item.noon}" onchange="Prescription.updateItem(${idx}, 'noon', this.value)"></td>
-                    <td><input type="number" step="0.5" min="0" value="${item.evening}" onchange="Prescription.updateItem(${idx}, 'evening', this.value)"></td>
-                    <td><input type="number" step="0.5" min="0" value="${item.night}" onchange="Prescription.updateItem(${idx}, 'night', this.value)"></td>
-                    <td style="text-align:center;">
-                        <input type="checkbox" ${item.isOwn ? 'checked' : ''} onchange="Prescription.updateItem(${idx}, 'isOwn', this.checked)">
+                        <div class="drug-title">${item.brand_name}</div>
+                        <div class="ingredient-badge">Hatóanyag: ${item.active_ingredient || '-'}</div>
                     </td>
                     <td style="text-align:center;">
-                        <button class="remove-btn" onclick="Prescription.removeItem(${idx})">🗑</button>
+                        <input type="number" min="0" step="0.5" value="${item.dose_morning}" ${isLocked ? 'disabled' : ''} onchange="Prescription.updateDose(${idx}, 'dose_morning', this.value)">
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="number" min="0" step="0.5" value="${item.dose_noon}" ${isLocked ? 'disabled' : ''} onchange="Prescription.updateDose(${idx}, 'dose_noon', this.value)">
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="number" min="0" step="0.5" value="${item.dose_evening}" ${isLocked ? 'disabled' : ''} onchange="Prescription.updateDose(${idx}, 'dose_evening', this.value)">
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="number" min="0" step="0.5" value="${item.dose_night}" ${isLocked ? 'disabled' : ''} onchange="Prescription.updateDose(${idx}, 'dose_night', this.value)">
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="checkbox" ${item.is_patient_brought ? 'checked' : ''} ${isLocked ? 'disabled' : ''} onchange="Prescription.togglePatientBrought(${idx}, this.checked)">
+                    </td>
+                    <td style="text-align:center;">
+                        <button class="remove-btn" ${isLocked ? 'disabled' : ''} onclick="Prescription.removeDrug(${idx})">🗑</button>
                     </td>
                 </tr>
             `;
@@ -195,59 +260,121 @@ const Prescription = {
         tbody.innerHTML = html;
     },
 
-    // 7. Igénylés mentése és feladása a Patikának (Supabase)
-    async submitOrder() {
-        const user = Auth.getCurrentUser();
-        if (!user) return;
+    // Előző jóváhagyott terápia másolása
+    copyPreviousDay: async function() {
+        if (!this.currentPatient) return;
 
-        if (this.items.length === 0) {
-            alert("Kérjük, legalább egy gyógyszert adjon hozzá az igényléshez!");
+        try {
+            const { data: pastPrescriptions } = await window.supabaseClient
+                .from('prescriptions')
+                .select('*, prescription_items(*, pupha_master(*))')
+                .eq('patient_id', this.currentPatient.id)
+                .in('status', ['reviewed', 'dispensed', 'completed'])
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (!pastPrescriptions || pastPrescriptions.length === 0) {
+                alert("Nincs korábbi jóváhagyott terápia ehhez a beteghez!");
+                return;
+            }
+
+            const pastItems = pastPrescriptions[0].prescription_items || [];
+            this.orderItems = pastItems.map(item => {
+                const pupha = item.pupha_master;
+                return {
+                    pupha_id: item.pupha_id,
+                    brand_name: item.substituted_name || (pupha ? pupha.brand_name : ''),
+                    active_ingredient: item.substituted_ingredient || (pupha ? pupha.active_ingredient : ''),
+                    dose_morning: item.dose_morning || 0,
+                    dose_noon: item.dose_noon || 0,
+                    dose_evening: item.dose_evening || 0,
+                    dose_night: item.dose_night || 0,
+                    is_patient_brought: item.is_patient_brought || false
+                };
+            });
+
+            this.renderOrderTable();
+            alert("Előző jóváhagyott terápia sikeresen bemásolva!");
+
+        } catch (e) {
+            console.error("Másolási hiba:", e);
+        }
+    },
+
+    // 4. pont: Rendelés feladása vagy Módosítása (INSERT vs UPDATE)
+    submitOrder: async function() {
+        if (!this.currentPatient) return;
+        if (this.orderItems.length === 0) {
+            alert("Kérjük, adjon hozzá legalább egy gyógyszert a rendeléshez!");
             return;
         }
 
         try {
-            const todayStr = new Date().toISOString().replace(/-/g, '').slice(0, 8);
-            const barcode = `DA-${todayStr}-${this.currentPatientId.substring(0, 4)}`;
+            const user = Auth.getCurrentUser();
+            let prescriptionId = this.currentPrescriptionId;
 
-            // Fejléc mentése / frissítése
-            const { data: prescription, error: pError } = await window.supabaseClient
-                .from('prescriptions')
-                .upsert({
-                    id: this.currentPrescriptionId || undefined,
-                    patient_id: this.currentPatientId,
-                    barcode: barcode,
-                    status: 'submitted',
-                    prescribed_by: user.id
-                })
-                .select()
-                .single();
+            if (prescriptionId) {
+                // 1. MEGLÉVŐ IGÉNYLÉS MÓDOSÍTÁSA (UPDATE)
+                const { error: updateErr } = await window.supabaseClient
+                    .from('prescriptions')
+                    .update({
+                        status: 'submitted',
+                        updated_at: new Date()
+                    })
+                    .eq('id', prescriptionId);
 
-            if (pError) throw pError;
+                if (updateErr) throw updateErr;
 
-            // Régi tételek törlése és újak beszúrása
-            if (this.currentPrescriptionId) {
-                await window.supabaseClient.from('prescription_items').delete().eq('prescription_id', prescription.id);
+                // Régi tételek törlése és újak beszúrása
+                await window.supabaseClient
+                    .from('prescription_items')
+                    .delete()
+                    .eq('prescription_id', prescriptionId);
+
+            } else {
+                // 2. ÚJ IGÉNYLÉS LÉTREHOZÁSA (INSERT)
+                const barcode = 'DA-' + new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+
+                const { data: newPresc, error: insertErr } = await window.supabaseClient
+                    .from('prescriptions')
+                    .insert({
+                        patient_id: this.currentPatient.id,
+                        doctor_id: user ? user.id : null,
+                        status: 'submitted',
+                        barcode: barcode
+                    })
+                    .select()
+                    .single();
+
+                if (insertErr) throw insertErr;
+                prescriptionId = newPresc.id;
             }
 
-            const itemsToInsert = this.items.map(item => ({
-                prescription_id: prescription.id,
-                pupha_drug_id: item.pupha_id,
-                dose_morning: item.morning,
-                dose_noon: item.noon,
-                dose_evening: item.evening,
-                dose_night: item.night,
-                is_own_medication: item.isOwn,
-                original_order_text: item.originalOrder || `${item.name} (${item.morning}-${item.noon}-${item.evening}-${item.night})`
+            // TÉTELEK BESZÚRÁSA
+            const itemsToInsert = this.orderItems.map(item => ({
+                prescription_id: prescriptionId,
+                pupha_id: item.pupha_id || null,
+                substituted_name: item.brand_name,
+                substituted_ingredient: item.active_ingredient,
+                dose_morning: item.dose_morning,
+                dose_noon: item.dose_noon,
+                dose_evening: item.dose_evening,
+                dose_night: item.dose_night,
+                is_patient_brought: item.is_patient_brought
             }));
 
-            await window.supabaseClient.from('prescription_items').insert(itemsToInsert);
+            const { error: itemsErr } = await window.supabaseClient
+                .from('prescription_items')
+                .insert(itemsToInsert);
 
-            alert("Gyógyszerigénylés sikeresen feladva a Patikának!");
-            window.location.href = 'ward.html';
+            if (itemsErr) throw itemsErr;
 
-        } catch (err) {
-            console.error("Hiba a feladás során:", err);
-            alert("Rendszerhiba történt a feladás közben!");
+            alert("Gyógyszerigénylés sikeresen elküldve a Patikának!");
+            window.location.replace("doctor-dashboard.html");
+
+        } catch (e) {
+            console.error("Hiba az igénylés mentésekor:", e);
+            alert("Hiba történt a rendelés elküldése során: " + (e.message || e));
         }
     }
 };
