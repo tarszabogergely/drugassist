@@ -79,89 +79,129 @@ header h1 {
     border-radius: 10px;
 }
 
-/* DÁTUMVÁLASZTÓ KÁRTYA */
-.date-picker-box {
+/* UJ, CSODAS DÁTUMVÁLASZTÓ KÁRTYA */
+.date-picker-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 16px;
+    padding: 22px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(46, 125, 50, 0.06);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #eaf8ed;
-    border: 2px dashed #4caf50;
-    padding: 18px 28px;
-    border-radius: 16px;
-    margin-bottom: 24px;
-    gap: 20px;
+    gap: 24px;
+    flex-wrap: wrap;
 }
 
-.dates-left {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.date-group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.date-group label {
-    font-size: 11px;
-    font-weight: 800;
-    color: #2e7d32;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.date-group input {
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid #a5d6a7;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1b5e20;
-    outline: none;
-    background: white;
-}
-
-.quick-buttons-center {
+.date-inputs-wrapper {
     display: flex;
     align-items: center;
     gap: 16px;
 }
 
-.quick-btn {
-    padding: 12px 20px;
+.date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.date-field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #166534;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.date-input-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.date-input-box input[type="date"] {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1.5px solid #86efac;
     background: white;
-    border: 2px solid #2e7d32;
-    color: #1b5e20;
-    border-radius: 14px;
-    font-size: 15px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #14532d;
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    cursor: pointer;
+}
+
+.date-input-box input[type="date"]:focus {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.date-separator {
+    color: #86efac;
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 18px;
+}
+
+.quick-presets {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.preset-btn {
+    background: white;
+    border: 1.5px solid #16a34a;
+    color: #15803d;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
 }
 
-.quick-btn:hover {
-    background: #2e7d32;
+.preset-btn:hover {
+    background: #16a34a;
     color: white;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
 }
 
-.days-pill-right {
-    background: #2e7d32;
+.days-counter-badge {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
     color: white;
-    padding: 14px 40px;
-    border-radius: 30px;
-    font-weight: 900;
-    font-size: 26px;
-    letter-spacing: 1px;
-    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+    padding: 12px 28px;
+    border-radius: 14px;
     text-align: center;
-    min-width: 140px;
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 130px;
+}
+
+.days-counter-number {
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.days-counter-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.9;
+    margin-top: 3px;
+    letter-spacing: 0.5px;
 }
 
 /* TERÁPIA FEJLÉC */
@@ -329,30 +369,36 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     </div>
 </section>
 
-<!-- DÁTUMVÁLASZTÓ SÁV -->
-<div class="date-picker-box">
-    <div class="dates-left">
-        <div class="date-group">
-            <label>Kezdő dátum (melyik naptól)</label>
-            <input type="date" id="startDate" onchange="calculateDays()">
+<!-- ÚJ, TISZTA ÉS MODERN DÁTUMVÁLASZTÓ KÁRTYA -->
+<div class="date-picker-card">
+    <div class="date-inputs-wrapper">
+        <div class="date-field">
+            <label>Kezdő dátum</label>
+            <div class="date-input-box">
+                <input type="date" id="startDate" onchange="calculateDays()">
+            </div>
         </div>
-        <div class="date-group">
-            <label>Záró dátum (melyik napig)</label>
-            <input type="date" id="endDate" onchange="calculateDays()">
+        <div class="date-separator">→</div>
+        <div class="date-field">
+            <label>Záró dátum</label>
+            <div class="date-input-box">
+                <input type="date" id="endDate" onchange="calculateDays()">
+            </div>
         </div>
     </div>
 
-    <div class="quick-buttons-center">
-        <button class="quick-btn" onclick="setWeekendDates(true)">
-            📱 Hosszú Hétvége (Pé - Vas)
+    <div class="quick-presets">
+        <button class="preset-btn" onclick="setWeekendDates(true)">
+            📅 Hosszú hétvége (Pé–Vas)
         </button>
-        <button class="quick-btn" onclick="setWeekendDates(false)">
-            📱 Hétvége (Szo - Vas)
+        <button class="preset-btn" onclick="setWeekendDates(false)">
+            📅 Hétvége (Szo–Vas)
         </button>
     </div>
 
-    <div class="days-pill-right" id="daysPill">
-        2 Nap
+    <div class="days-counter-badge">
+        <div class="days-counter-number" id="daysCountNum">2</div>
+        <div class="days-counter-label" id="daysCountLabel">Napos igénylés</div>
     </div>
 </div>
 
@@ -402,7 +448,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 <script>
 let currentPatientId = null;
-let selectedItems = []; // { puphaDrugId, localDrugId, brandName, activeIngredient, doseMorning, doseNoon, doseEvening, doseNight, isLocal }
+let selectedItems = []; 
 let searchDebounceTimeout = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -505,9 +551,11 @@ function calculateDays() {
     if (start && end && end >= start) {
         const diffTime = Math.abs(end - start);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        document.getElementById("daysPill").innerText = `${diffDays} Nap`;
+        document.getElementById("daysCountNum").innerText = diffDays;
+        document.getElementById("daysCountLabel").innerText = "Napos igénylés";
     } else {
-        document.getElementById("daysPill").innerText = "0 Nap";
+        document.getElementById("daysCountNum").innerText = "0";
+        document.getElementById("daysCountLabel").innerText = "Érvénytelen dátum";
     }
 }
 
@@ -529,7 +577,6 @@ function setWeekendDates(includeFriday) {
     calculateDays();
 }
 
-// DEBOUNCE A KERESÉSHEZ (GÉPELÉS KÖZBEN NE HÍVJA TÚL SOKSZOR A SUPABASE-T)
 function handleSearchInput(query) {
     clearTimeout(searchDebounceTimeout);
     searchDebounceTimeout = setTimeout(() => {
@@ -537,7 +584,6 @@ function handleSearchInput(query) {
     }, 250);
 }
 
-// ÉLŐ KERESÉS KÖZVETLENÜL A SUPABASE ADATBÁZISBAN (LOKÁLIS ÉS PUPHA)
 async function searchDrugLive(query) {
     const container = document.getElementById("searchResults");
     if (!query || query.trim().length < 2) {
@@ -548,7 +594,6 @@ async function searchDrugLive(query) {
     const q = `%${query.trim()}%`;
 
     try {
-        // PÁRHUZAMOS LEKÉRDEZÉS MINDKÉT TÁBLÁBÓL
         const [localRes, puphaRes] = await Promise.all([
             window.supabaseClient
                 .from('local_inventory_master')
