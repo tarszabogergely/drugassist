@@ -191,7 +191,7 @@ const Prescription = {
             pupha_id: puphaId,
             brand_name: brandName,
             active_ingredient: activeIngredient,
-            dose_morning: 1,
+            dose_morning: 0,
             dose_noon: 0,
             dose_evening: 0,
             dose_night: 0,
