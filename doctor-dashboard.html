@@ -499,15 +499,21 @@ function renderPatientTable(patients) {
                 <td style="color:#475569;">${birthDateFormatted}${ageStr}</td>
                 <td>${statusBadge}</td>
                 <td style="text-align: right;">
-                    ${viewStatus === 'active' ? `
-                        <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Gyógyszerelés</button>
-                        <button class="weekend-btn" onclick="location.href='multi-day-prescription.html?patientId=${p.id}'">📅 Hétvégi / Többnapos</button>
-                        <button class="edit-btn" onclick="openPatientModal(${idx})">✏️ Szerkesztés</button>
-                        <button class="discharge-btn" onclick="dischargePatient('${p.id}', '${p.name}')">Hazament</button>
-                    ` : `
-                        <button class="reactivate-btn" onclick="reactivatePatient('${p.id}', '${p.name}')">♻️ Újragyógyszerezés / Reaktiválás</button>
-                    `}
-                </td>
+    ${viewStatus === 'active' ? `
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+            <div style="display: flex; gap: 4px;">
+                <button class="action-btn" onclick="location.href='prescription.html?patientId=${p.id}'">📋 Mai gyógyszerelés</button>
+                <button class="weekend-btn" onclick="location.href='multi-day-prescription.html?patientId=${p.id}'">📅 Többnapos gyógyszerelés</button>
+            </div>
+            <div style="display: flex; gap: 4px;">
+                <button class="edit-btn" style="margin-left:0;" onclick="openPatientModal(${idx})">✏️ Szerkesztés</button>
+                <button class="discharge-btn" style="margin-left:0;" onclick="dischargePatient('${p.id}', '${p.name}')">Hazament</button>
+            </div>
+        </div>
+    ` : `
+        <button class="reactivate-btn" onclick="reactivatePatient('${p.id}', '${p.name}')">♻️ Újragyógyszerezés / Reaktiválás</button>
+    `}
+</td>
             </tr>
         `;
     });
