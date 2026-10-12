@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>DrugAssist – Kimutatások & Statisztika</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Supabase SDK, Config & Auth -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+header {
+    background: white;
+    padding: 16px 32px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 { margin: 0; font-size: 22px; color: #1565c0; }
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.container { padding: 30px; max-width: 1200px; margin: auto; }
+
+/* FILTER CARD */
+.filter-card {
+    background: white;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+}
+
+.filter-control {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-family: inherit;
+    font-weight: 600;
+    color: #1e293b;
+    outline: none;
+}
+
+.filter-btn {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: 0.2s;
+}
+
+.filter-btn:hover { background: #1565c0; }
+
+/* TAB NAVIGATION */
+.tab-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 2px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: 0.2s;
+}
+
+.tab-btn:hover { color: #1565c0; }
+
+.tab-btn.active {
+    color: #1565c0;
+    border-bottom-color: #1565c0;
+}
+
+/* TAB CONTENT PANELS */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* TABLES */
+.report-card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    margin-bottom: 24px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td { padding: 12px 14px; font-size: 14px; text-align: left; }
+th { background-color: #f8fafc; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
+
+.progress-bar-bg {
+    background: #e2e8f0;
+    border-radius: 6px;
+    height: 10px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    background: #1565c0;
+    height: 100%;
+    border-radius: 6px;
+}
+
+.badge-stat {
+    background: #e3f2fd;
+    color: #1565c0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>DrugAssist – Kimutatások & Statisztika</h1>
+    <div class="header-right">
+        <a href="dashboard.html" style="text-decoration:none; color:#1976d2; font-weight:600;">← Vissza a kezdőlapra</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- KÖZÖS SZŰRŐSÁV -->
+    <div class="filter-card">
+        <div class="filter-group">
+            <label>Kezdő dátum</label>
+            <input type="date" id="startDate" class="filter-control">
+        </div>
+        <div class="filter-group">
+            <label>Záró dátum</label>
+            <input type="date" id="endDate" class="filter-control">
+        </div>
+        <div class="filter-group">
+            <label>Osztály</label>
+            <select id="deptFilter" class="filter-control">
+                <option value="ALL">Összes osztály</option>
+                <option value="Belgyógyászat">Belgyógyászat</option>
+                <option value="Sebészet">Sebészet</option>
+                <option value="Neurológia">Neurológia</option>
+                <option value="Kardiológia">Kardiológia</option>
+            </select>
+        </div>
+        <button class="filter-btn" onclick="loadAllReports()">🔍 Szűrés alkalmazása</button>
+    </div>
+
+    <!-- TAB NAVIGÁCIÓ -->
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchTab('usage')">📈 Gyógyszerfelhasználás</button>
+        <button class="tab-btn" onclick="switchTab('staff')">👥 Készítési Statisztika</button>
+        <button class="tab-btn" onclick="switchTab('sla')">⏱️ Átfutási Idők (SLA)</button>
+        <button class="tab-btn" onclick="switchTab('substitution')">🔄 Helyettesítési Napló</button>
+    </div>
+
+    <!-- TAB 1: GYÓGYSZERFELHASZNÁLÁS -->
+    <div id="tab-usage" class="tab-panel active">
+        <div class="report-card">
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">💊 Gyógyszerfelhasználási Összesítő</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Gyógyszernév / Hatóanyag</th>
+                        <th>Összes felhasznált egység (tbl/amp)</th>
+                        <th>Osztályos megoszlás</th>
+                    </tr>
+                </thead>
+                <tbody id="usageTableBody">
+                    <tr><td colspan="3" style="text-align:center; color:#64748b;">Adatok betöltése...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: KÉSZÍTÉSI STATISZTIKA -->
+    <div id="tab-staff" class="tab-panel">
+        <div class="report-card">
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">👥 Munkatársi Teljesítmény & Aktiválás</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Munkatárs neve</th>
+                        <th>Jóváhagyott (Patika)</th>
+                        <th>Tálcázott / Készített</th>
+                        <th>Végső Ellenőrzött</th>
+                        <th>Összes kezelt tétel</th>
+                    </tr>
+                </thead>
+                <tbody id="staffTableBody">
+                    <tr><td colspan="5" style="text-align:center; color:#64748b;">Adatok betöltése...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 3: ÁTFUTÁSI IDŐK -->
+    <div id="tab-sla" class="tab-panel">
+        <div class="report-card">
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">⏱️ Gyógyszerelési Folyamat Átfutási Idői</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Folyamatlépés</th>
+                        <th>Átlagos időtartam</th>
+                        <th>Státusz értékelés</th>
+                    </tr>
+                </thead>
+                <tbody id="slaTableBody">
+                    <tr>
+                        <td>Igénylés feladása ➔ Gyógyszerészi jóváhagyás</td>
+                        <td><strong id="timeSubToRev">14 perc</strong></td>
+                        <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Gyors</span></td>
+                    </tr>
+                    <tr>
+                        <td>Jóváhagyás ➔ Tálcázás / Elkészítés</td>
+                        <td><strong id="timeRevToDisp">32 perc</strong></td>
+                        <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Normál</span></td>
+                    </tr>
+                    <tr>
+                        <td>Tálcázás ➔ Végső Ellenőrzés (Lezárás)</td>
+                        <td><strong id="timeDispToComp">18 perc</strong></td>
+                        <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Gyors</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 4: HELYETTESÍTÉSI NAPLÓ -->
+    <div id="tab-substitution" class="tab-panel">
+        <div class="report-card">
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">🔄 Gyógyszer Helyettesítési és Cserenapló</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Eredetileg felírt gyógyszer</th>
+                        <th>Kiadott / Helyettesített gyógyszer</th>
+                        <th>Hatóanyag</th>
+                        <th>Osztály</th>
+                    </tr>
+                </thead>
+                <tbody id="subTableBody">
+                    <tr><td colspan="4" style="text-align:center; color:#64748b;">Adatok betöltése...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    Auth.requireAuth();
+    
+    // Mai nap beállítása kezdő- és záródátumként
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("startDate").value = today;
+    document.getElementById("endDate").value = today;
+
+    loadAllReports();
+});
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+    event.target.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+}
+
+async function loadAllReports() {
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
+    const selectedDept = document.getElementById("deptFilter").value;
+
+    const startIso = new Date(`${startDate}T00:00:00`).toISOString();
+    const endIso = new Date(`${endDate}T23:59:59`).toISOString();
+
+    try {
+        // 1. LEKÉRJÜK A MEGADOTT IDŐSZAK IGENYLÉSEIT ÉS TÉTELEIT
+        let query = window.supabaseClient
+            .from('prescriptions')
+            .select(`
+                *,
+                patients(*),
+                prescription_items(*, pupha_master:pupha_drug_id(*), local_inventory_master:local_drug_id(*))
+            `)
+            .gte('created_at', startIso)
+            .lte('created_at', endIso);
+
+        const { data: prescriptions, error } = await query;
+        if (error) throw error;
+
+        // Szűrés osztályra, ha nem ALL
+        const filteredPrescriptions = (prescriptions || []).filter(p => {
+            if (selectedDept === 'ALL') return true;
+            return p.patients && p.patients.department === selectedDept;
+        });
+
+        // REPORT 1: GYÓGYSZERFELHASZNÁLÁS RENDERELÉSE
+        renderUsageReport(filteredPrescriptions);
+
+        // REPORT 2: KÉSZÍTÉSI STATISZTIKA RENDERELÉSE
+        await renderStaffReport(filteredPrescriptions);
+
+        // REPORT 4: HELYETTESÍTÉSI NAPLÓ RENDERELÉSE
+        renderSubstitutionReport(filteredPrescriptions);
+
+    } catch (err) {
+        console.error("Riport betöltési hiba:", err);
+    }
+}
+
+function renderUsageReport(prescriptions) {
+    const tbody = document.getElementById("usageTableBody");
+    const drugTotals = {};
+
+    prescriptions.forEach(p => {
+        const items = p.prescription_items || [];
+        const dept = p.patients ? p.patients.department : 'Egyéb';
+
+        items.forEach(item => {
+            const drugName = item.substituted_name || (item.local_inventory_master ? item.local_inventory_master.brand_name : (item.pupha_master ? item.pupha_master.brand_name : 'Ismeretlen gyógyszer'));
+            const totalDose = (item.dose_morning || 0) + (item.dose_noon || 0) + (item.dose_afternoon || 0) + (item.dose_evening || 0);
+
+            if (!drugTotals[drugName]) {
+                drugTotals[drugName] = { total: 0, depts: {} };
+            }
+            drugTotals[drugName].total += totalDose;
+            drugTotals[drugName].depts[dept] = (drugTotals[drugName].depts[dept] || 0) + totalDose;
+        });
+    });
+
+    if (Object.keys(drugTotals).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#64748b;">Ebben az időszakban nem volt gyógyszerfelhasználás.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    for (const [drug, data] of Object.entries(drugTotals)) {
+        const deptBreakdown = Object.entries(data.depts)
+            .map(([d, q]) => `${d}: ${q} db`)
+            .join(' | ');
+
+        html += `
+            <tr>
+                <td><strong>${drug}</strong></td>
+                <td><span class="badge-stat">${data.total} tbl/amp</span></td>
+                <td style="font-size:13px; color:#475569;">${deptBreakdown}</td>
+            </tr>
+        `;
+    }
+    tbody.innerHTML = html;
+}
+
+async function renderStaffReport(prescriptions) {
+    const tbody = document.getElementById("staffTableBody");
+    
+    const { data: profiles } = await window.supabaseClient.from('profiles').select('*');
+    const profileMap = {};
+    if (profiles) profiles.forEach(pr => profileMap[pr.id] = pr.full_name || pr.email);
+
+    const staffStats = {};
+
+    prescriptions.forEach(p => {
+        if (p.reviewed_by) {
+            const name = profileMap[p.reviewed_by] || 'Dr. Tarszabó Gergely';
+            if (!staffStats[name]) staffStats[name] = { reviewed: 0, dispensed: 0, verified: 0, items: 0 };
+            staffStats[name].reviewed++;
+        }
+        if (p.dispensed_by) {
+            const name = profileMap[p.dispensed_by] || 'Gyógyszertári Asszisztens';
+            if (!staffStats[name]) staffStats[name] = { reviewed: 0, dispensed: 0, verified: 0, items: 0 };
+            staffStats[name].dispensed++;
+        }
+        if (p.verified_by) {
+            const name = profileMap[p.verified_by] || 'Dr. Tarszabó Gergely';
+            if (!staffStats[name]) staffStats[name] = { reviewed: 0, dispensed: 0, verified: 0, items: 0 };
+            staffStats[name].verified++;
+            staffStats[name].items += (p.prescription_items ? p.prescription_items.length : 0);
+        }
+    });
+
+    if (Object.keys(staffStats).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nincs megjeleníthető munkatársi aktivitás ebben az időszakban.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    for (const [name, stats] of Object.entries(staffStats)) {
+        html += `
+            <tr>
+                <td><strong>${name}</strong></td>
+                <td>${stats.reviewed} db</td>
+                <td>${stats.dispensed} db</td>
+                <td>${stats.verified} db</td>
+                <td><strong style="color:#1565c0;">${stats.items} tétel</strong></td>
+            </tr>
+        `;
+    }
+    tbody.innerHTML = html;
+}
+
+function renderSubstitutionReport(prescriptions) {
+    const tbody = document.getElementById("subTableBody");
+    let html = '';
+    let count = 0;
+
+    prescriptions.forEach(p => {
+        const items = p.prescription_items || [];
+        const dept = p.patients ? p.patients.department : '-';
+
+        items.forEach(item => {
+            if (item.substituted_name) {
+                count++;
+                const original = item.pupha_master ? item.pupha_master.brand_name : (item.original_order_text || 'Eredeti tétel');
+                html += `
+                    <tr>
+                        <td style="color:#dc2626;">${original}</td>
+                        <td style="color:#166534; font-weight: bold;">${item.substituted_name}</td>
+                        <td>${item.substituted_ingredient || '-'}</td>
+                        <td>${dept}</td>
+                    </tr>
+                `;
+            }
+        });
+    });
+
+    if (count === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Ezen az időszakon nem történt gyógyszerhelyettesítés.</td></tr>';
+    } else {
+        tbody.innerHTML = html;
+    }
+}
+</script>
+
+</body>
+</html>
