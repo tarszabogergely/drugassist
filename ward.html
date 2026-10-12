@@ -341,11 +341,6 @@ async function loadWardPatients() {
     }
 }
 
-function generateDepartmentPdf(departmentName) {
-    const formattedDate = selectedDate.toLocaleDateString('hu-HU');
-    alert(`📄 Osztályos összesítő PDF generálása a(z) "${departmentName}" osztályra (${formattedDate})...`);
-}
-
 function updateDateTime() {
     const now = new Date();
     document.getElementById("dateTime").innerText = now.toLocaleDateString("hu-HU") + " | " + now.toLocaleTimeString("hu-HU", {hour: '2-digit', minute: '2-digit'});
