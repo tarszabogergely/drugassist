@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DrugAssist – Tálcázás & Gyógyszerelés</title>
+<title>DrugAssist – Gyógyszerelés</title>
 
 <!-- Supabase SDK, Config & Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -28,7 +28,12 @@ header {
     align-items: center;
 }
 
-header h1 { margin: 0; font-size: 22px; color: #1565c0; }
+header h1 {
+    margin: 0;
+    font-size: 22px;
+    color: #1e293b; /* Vagy #000000 feketéhez */
+}
+    
 .user-info { color: #666; font-size: 14px; }
 
 .container {
@@ -231,7 +236,7 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
 <body>
 
 <header>
-    <h1>DrugAssist – Tálcázás & Gyógyszerelés</h1>
+    <h1>DrugAssist – Gyógyszerelés</h1>
     <div class="user-info">
         <span id="userName">Asszisztens</span> | <span id="dateTime"></span>
     </div>
