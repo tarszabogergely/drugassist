@@ -393,7 +393,6 @@ async function loadDepartmentPatients() {
             .order('room_bed', { ascending: true });
 
         if (error || !patients || patients.length === 0) {
-            console.warn("Nincs találat a betegekre:", { currentDept, viewStatus, error });
             tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:30px;">
                 Nincs ${viewStatus === 'active' ? 'aktív' : 'elbocsátott'} beteg a(z) "${currentDept}" osztályon.
             </td></tr>`;
@@ -401,11 +400,11 @@ async function loadDepartmentPatients() {
         }
 
         loadedPatients = patients;
-        const patientIds = patients.map(p => p.id);
+        const patientIds = patients.map(p => String(p.id));
 
         todaysPrescriptionsMap = {};
         
-        // 2. LÉPÉS: Legutolsó igénylések lekérése a betegekhez (dátumszűrő nélkül!)
+        // 2. LÉPÉS: Legfrissebb igénylések lekérése
         if (patientIds.length > 0) {
             const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
@@ -416,11 +415,10 @@ async function loadDepartmentPatients() {
             if (prescErr) {
                 console.error("Prescriptions lekérdezési hiba:", prescErr);
             } else if (prescriptions) {
-                console.log("Megtalált igénylések:", prescriptions);
                 prescriptions.forEach(p => {
-                    // Mivel időrendben csökkenő, a legfrissebb kerül be
-                    if (!todaysPrescriptionsMap[p.patient_id]) {
-                        todaysPrescriptionsMap[p.patient_id] = p;
+                    const pidStr = String(p.patient_id);
+                    if (!todaysPrescriptionsMap[pidStr]) {
+                        todaysPrescriptionsMap[pidStr] = p;
                     }
                 });
             }
@@ -433,7 +431,7 @@ async function loadDepartmentPatients() {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#c62828; padding:30px;">Hiba történt az adatok betöltése során.</td></tr>';
     }
 }
-// Táblázat kirajzolása és keresési szűrés
+
 function renderPatientTable(patients) {
     const tbody = document.getElementById("patientTableBody");
     const viewStatus = document.getElementById("statusFilter").value;
@@ -449,19 +447,22 @@ function renderPatientTable(patients) {
         const age = calculateAge(p.birth_date);
         const ageStr = age !== null ? ` (${age} év)` : '';
 
-        // Mai igénylés státuszának meghatározása
-        const presc = todaysPrescriptionsMap[p.id];
+        // Beteg azonosító biztos sztringgé alakítása a lekérdezéshez
+        const presc = todaysPrescriptionsMap[String(p.id)];
         let statusBadge = '<span class="status-badge status-none">Nincs feladva</span>';
 
         if (presc) {
-            if (presc.status === 'pending' || presc.status === 'draft') {
+            const st = presc.status;
+            if (st === 'pending' || st === 'draft') {
                 statusBadge = '<span class="status-badge status-pending">🟠 Jóváhagyásra vár</span>';
-            } else if (presc.status === 'reviewed') {
+            } else if (st === 'reviewed') {
                 statusBadge = '<span class="status-badge status-reviewed">🔵 Jóváhagyva (Patikában)</span>';
-            } else if (presc.status === 'dispensed') {
+            } else if (st === 'dispensed') {
                 statusBadge = '<span class="status-badge status-dispensed">🟣 Tálcázva (Ellenőrzésre vár)</span>';
-            } else if (presc.status === 'completed') {
+            } else if (st === 'completed') {
                 statusBadge = '<span class="status-badge status-completed">🟢 Elkészült & Ellenőrizve</span>';
+            } else {
+                statusBadge = `<span class="status-badge status-pending">${st}</span>`;
             }
         }
 
