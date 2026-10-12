@@ -31,7 +31,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
 
         const patientIds = patients.map(p => p.id);
 
-        // 2. IGÉNYLÉSEK LEKÉRDEZÉSE A BETEGEKHEZ (TÖBBLÉPCSŐS BIZTONSÁGI BIZTOSÍTÁSSAL)
+        // 2. IGÉNYLÉSEK LEKÉRDEZÉSE A BETEGEKHEZ
         const { data: prescriptions, error: prErr } = await window.supabaseClient
             .from('prescriptions')
             .select(`
@@ -128,15 +128,18 @@ async function generateDepartmentPdf(departmentName, targetDate) {
             const birthStr = patient.birth_date ? new Date(patient.birth_date).toLocaleDateString('hu-HU') : '-';
             const presc = prescMap[patient.id];
 
+            // SZIGORÚ ELLENŐRZÉS: Csak akkor jelenítjük meg a tételeket, ha a státusz LEZÁRT (completed)
+            const isCompleted = presc && presc.status === 'completed';
+
             // Felelős személyek neveinek lekérése
             const defaultDoctor = 'Dr. Tarszabó Gergely';
-            const prescribedBy = profileMap[presc?.prescribed_by] || defaultDoctor;
-            const reviewedBy = profileMap[presc?.reviewed_by] || defaultDoctor;
-            const dispensedBy = profileMap[presc?.dispensed_by] || 'Gyógyszertári Asszisztens';
-            const verifiedBy = profileMap[presc?.verified_by] || defaultDoctor;
+            const prescribedBy = isCompleted ? (profileMap[presc.prescribed_by] || defaultDoctor) : '-';
+            const reviewedBy = isCompleted ? (profileMap[presc.reviewed_by] || defaultDoctor) : '-';
+            const dispensedBy = isCompleted ? (profileMap[presc.dispensed_by] || 'Gyógyszertári Asszisztens') : '-';
+            const verifiedBy = isCompleted ? (profileMap[presc.verified_by] || defaultDoctor) : '-';
 
-            const barcode = presc?.barcode || (presc?.id ? 'DA-' + presc.id.slice(0, 8).toUpperCase() : 'Nincs azonosító');
-            const items = presc?.prescription_items || [];
+            const barcode = isCompleted ? (presc.barcode || 'DA-' + presc.id.slice(0, 8).toUpperCase()) : 'Nincs lezárva';
+            const items = (isCompleted && presc.prescription_items) ? presc.prescription_items : [];
 
             printContent += `
             <div class="patient-box">
@@ -177,7 +180,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
             if (items.length === 0) {
                 printContent += `
                     <tr>
-                        <td colspan="8" class="center" style="color: #64748b; padding: 8px;">Ezen a napon nincs elrendelt gyógyszer.</td>
+                        <td colspan="8" class="center" style="color: #64748b; padding: 8px;">Ezen a napon nincs elrendelt lezárt gyógyszer.</td>
                     </tr>
                 `;
             } else {
@@ -239,7 +242,7 @@ async function generateDepartmentPdf(departmentName, targetDate) {
         </html>
         `;
 
-        // 4. DOKUMENTUM CÍM BEÁLLÍTÁSA A MENTÉSHEZ ÉS MEGNYITÁS
+        // 4. DOKUMENTUM MEGNYITÁSA ÉS NYOMTATÁSA
         const printWindow = window.open('', '_blank');
         printWindow.document.write(printContent);
         printWindow.document.title = fileName;
