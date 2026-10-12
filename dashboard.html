@@ -46,27 +46,19 @@ header h1 {
     font-size: 14px;
 }
 
-/* FIXÁLT, NEM KATTINTHATÓ JELVÉNYEK */
-.badge-select {
-    padding: 6px 14px;
-    border-radius: 20px;
-    border: 1px solid #d0d7e2;
-    background: #eef4fb;
-    color: #1976d2;
+/* BUBORÉK ÉS KERET NÉLKÜLI SIMA SZÖVEGES KIJELZÉS */
+.plain-select {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #475569;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
     outline: none;
     cursor: default;
-    opacity: 0.95;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-}
-
-.badge-select.dept {
-    background: #f0f7ed;
-    color: #2e7d32;
-    border-color: #c8e6c9;
 }
 
 .logout-btn {
@@ -239,17 +231,20 @@ header h1 {
     <h1>DrugAssist</h1>
     <div class="header-right">
         <span id="userName" class="user-name">Munkatárs</span>
+        <span style="color: #cbd5e1;">|</span>
         
-        <!-- FIXÁLT SZEREPKÖR VÁLASZTÓ (DISABLED) -->
-        <select id="roleSelector" class="badge-select" disabled>
-            <option value="pharmacist">🧪 Gyógyszerész</option>
-            <option value="doctor">📋 Orvos / Igénylő</option>
-            <option value="assistant">💊 Asszisztens</option>
-            <option value="nurse">🏥 Ápoló</option>
+        <!-- IKON ÉS BUBORÉK NÉLKÜLI SZEREPKÖR KIJELZÉS -->
+        <select id="roleSelector" class="plain-select" disabled>
+            <option value="pharmacist">Gyógyszerész</option>
+            <option value="doctor">Orvos / Igénylő</option>
+            <option value="assistant">Asszisztens</option>
+            <option value="nurse">Ápoló</option>
         </select>
 
-        <!-- FIXÁLT OSZTÁLY VÁLASZTÓ (DISABLED) -->
-        <select id="deptSelector" class="badge-select dept" disabled>
+        <span style="color: #cbd5e1;">|</span>
+
+        <!-- BUBORÉK NÉLKÜLI OSZTÁLY KIJELZÉS -->
+        <select id="deptSelector" class="plain-select" disabled>
             <option value="Belgyógyászat">Belgyógyászat</option>
             <option value="Sebészet">Sebészet</option>
             <option value="Neurológia">Neurológia</option>
@@ -322,7 +317,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (user) {
         document.getElementById("userName").innerText = user.name || user.email;
 
-        // FELHASZNÁLÓI PROFIL LEKÉRDEZÉSE A SUPABASE-BŐL A FEJLÉC FIXÁLÁSÁHOZ
         try {
             const { data: profile } = await window.supabaseClient
                 .from('profiles')
@@ -340,7 +334,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
                 const deptSel = document.getElementById("deptSelector");
                 if (deptSel && profile.department) {
-                    // Ha az adott osztály még nincs a listában, hozzáadjuk opcióként, hogy mindig helyesen jelenjen meg
                     let exists = Array.from(deptSel.options).some(opt => opt.value === profile.department);
                     if (!exists) {
                         const opt = document.createElement('option');
@@ -370,7 +363,6 @@ async function loadDashboardData() {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
 
-        // 1. LEKÉRJÜK AZ ÖSSZES AKTÍV BETEGET ÉS CSOPORTOSÍTJUK OSZTÁLYONKÉNT
         const { data: activePatients, error: patErr } = await window.supabaseClient
             .from('patients')
             .select('id, name, department')
@@ -392,7 +384,6 @@ async function loadDashboardData() {
             deptPatientsMap[dept].push(p.id);
         });
 
-        // 2. LEKÉRJÜK A MAI NAPON LÉTREHOZOTT IGÉNYLÉSEKET
         const { data: todayPrescriptions, error: pErr } = await window.supabaseClient
             .from('prescriptions')
             .select('id, status, patient_id')
@@ -420,13 +411,11 @@ async function loadDashboardData() {
             });
         }
 
-        // Felső kártyák számainak frissítése
         document.getElementById("cntSubmitted").innerText = cntSubmitted;
         document.getElementById("cntReviewed").innerText = cntReviewed;
         document.getElementById("cntDispensed").innerText = cntDispensed;
         document.getElementById("cntCompleted").innerText = cntCompleted;
 
-        // 3. OSZTÁLYOK KÁRTYÁINAK ÖSSZEÁLLÍTÁSA
         const wardContainer = document.getElementById("wardGridContainer");
         let html = '';
 
