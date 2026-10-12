@@ -16,12 +16,12 @@
 body {
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
-    background-color: #f0fdf4; /* Halvány zöldes háttér a hétvégi mód megkülönböztetésére */
+    background-color: #f0fdf4;
 }
 
 header {
     background: white;
-    padding: 18px 32px;
+    padding: 16px 32px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
     justify-content: space-between;
@@ -47,7 +47,7 @@ header h1 {
 }
 
 .container {
-    max-width: 1100px;
+    max-width: 1150px;
     margin: auto;
     padding: 32px;
 }
@@ -79,73 +79,121 @@ header h1 {
     border-radius: 10px;
 }
 
-/* DÁTUMS ZŰRŐ & INTERVALLUM KÁRTYA */
+/* DÁTUMVÁLASZTÓ KÁRTYA A CSATOLT KÉP ALAPJÁN */
 .date-picker-box {
     display: flex;
     align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-    background: #e8f5e9;
+    justify-content: space-between;
+    background: #eaf8ed;
     border: 2px dashed #4caf50;
-    padding: 18px 24px;
-    border-radius: 12px;
+    padding: 18px 28px;
+    border-radius: 16px;
     margin-bottom: 24px;
+    gap: 20px;
+}
+
+.dates-left {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .date-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .date-group label {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11px;
+    font-weight: 800;
     color: #2e7d32;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .date-group input {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 8px;
     border: 1px solid #a5d6a7;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
+    color: #1b5e20;
     outline: none;
+    background: white;
+}
+
+.quick-buttons-center {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
 .quick-btn {
-    padding: 8px 14px;
+    padding: 12px 20px;
     background: white;
-    border: 1px solid #4caf50;
-    color: #2e7d32;
+    border: 2px solid #2e7d32;
+    color: #1b5e20;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.quick-btn:hover {
+    background: #2e7d32;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.days-pill-right {
+    background: #2e7d32;
+    color: white;
+    padding: 14px 40px;
+    border-radius: 30px;
+    font-weight: 900;
+    font-size: 26px;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+    text-align: center;
+    min-width: 140px;
+}
+
+/* TERÁPIA FEJLÉC & PREVIOUS LOAD BTN */
+.therapy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.load-prev-btn {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+    padding: 9px 18px;
     border-radius: 8px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: 0.2s;
 }
 
-.quick-btn:hover {
-    background: #4caf50;
+.load-prev-btn:hover {
+    background: #1565c0;
     color: white;
-}
-
-.days-count-badge {
-    margin-left: auto;
-    background: #2e7d32;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: 14px;
 }
 
 /* SEARCH & DRUG TABLE */
 .search-box {
     display: flex;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 
 .search-input {
@@ -230,32 +278,46 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     </div>
 </section>
 
-<!-- DÁTUMS ZŰRŐ ÉS TÓL-IG NAPTÁR -->
+<!-- DÁTUMVÁLASZTÓ SÁV -->
 <div class="date-picker-box">
-    <div class="date-group">
-        <label>Kezdő Dátum (Melyik naptól)</label>
-        <input type="date" id="startDate" onchange="calculateDays()">
-    </div>
-    <div class="date-group">
-        <label>Záró Dátum (Melyik napig)</label>
-        <input type="date" id="endDate" onchange="calculateDays()">
+    <div class="dates-left">
+        <div class="date-group">
+            <label>Kezdő dátum (melyik naptól)</label>
+            <input type="date" id="startDate" onchange="calculateDays()">
+        </div>
+        <div class="date-group">
+            <label>Záró dátum (melyik napig)</label>
+            <input type="date" id="endDate" onchange="calculateDays()">
+        </div>
     </div>
 
-    <button class="quick-btn" onclick="setWeekendDates(false)">📅 Hétvége (Szo - Vas)</button>
-    <button class="quick-btn" onclick="setWeekendDates(true)">📅 Hosszú Hétvége (Pé - Vas)</button>
+    <div class="quick-buttons-center">
+        <button class="quick-btn" onclick="setWeekendDates(true)">
+            📱 Hosszú Hétvége (Pé - Vas)
+        </button>
+        <button class="quick-btn" onclick="setWeekendDates(false)">
+            📱 Hétvége (Szo - Vas)
+        </button>
+    </div>
 
-    <div class="days-count-badge" id="daysCountBadge">1 Napos Igénylés</div>
+    <div class="days-pill-right" id="daysPill">
+        2 Nap
+    </div>
 </div>
 
 <!-- GYÓGYSZER HOZZÁADÁSA & TÁBLÁZAT -->
 <section class="card">
-    <h3 style="margin-top:0; color:#1e293b;">💊 Terápia Sorai (Napi adagolás)</h3>
+    <div class="therapy-header">
+        <h3 style="margin:0; color:#1e293b;">💊 Terápia Sorai (Napi adagolás)</h3>
+        <button class="load-prev-btn" onclick="loadPreviousPrescription()">📋 Előző terápia betöltése</button>
+    </div>
+
     <p style="font-size:13px; color:#64748b; margin-bottom:15px;">
-        Az itt beállított napi adagolást a rendszer automatikusan megsokszorozza és külön igénylésként menti el a kiválasztott intervallum minden egyes napjára.
+        A beállított napi adagolást a rendszer megsokszorozza és külön igénylésként menti el a kiválasztott intervallum minden egyes napjára.
     </p>
 
     <div class="search-box">
-        <input type="text" id="drugSearchInput" class="search-input" placeholder="Gyógyszer keresése név vagy hatóanyag alapján..." onkeyup="searchDrug(this.value)">
+        <input type="text" id="drugSearchInput" class="search-input" placeholder="Gyógyszer keresése név vagy hatóanyag alapján (Helyi készlet & PUPHA)..." onkeyup="searchDrug(this.value)">
     </div>
     <div id="searchResults" style="margin-bottom:15px;"></div>
 
@@ -289,7 +351,8 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 <script>
 let currentPatientId = null;
-let selectedItems = []; // { drugId, brandName, activeIngredient, doseMorning, doseNoon, doseEvening, doseNight }
+let selectedItems = []; // { puphaDrugId, localDrugId, brandName, activeIngredient, doseMorning, doseNoon, doseEvening, doseNight }
+let localDrugsList = [];
 let puphaMasterList = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -298,7 +361,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("userName").innerText = user.name || user.email;
     }
 
-    // Alapértelmezett dátumok beállítása (Mai nap -> Holnap)
+    // Alapértelmezett dátumok (Mai nap -> Holnap)
     const today = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(today.getDate() + 1);
@@ -313,7 +376,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (currentPatientId) {
         await loadPatient(currentPatientId);
     }
-    await loadPuphaMaster();
+    await loadDrugMasters();
 });
 
 async function loadPatient(patientId) {
@@ -336,12 +399,72 @@ async function loadPatient(patientId) {
     }
 }
 
-async function loadPuphaMaster() {
-    const { data } = await window.supabaseClient
-        .from('pupha_master')
-        .select('id, brand_name, active_ingredient')
-        .limit(100);
-    puphaMasterList = data || [];
+// 1. HELYI KÉSZLET ÉS PUPHA KÉSZLET BETÖLTÉSE
+async function loadDrugMasters() {
+    try {
+        const { data: local } = await window.supabaseClient
+            .from('local_inventory_master')
+            .select('id, brand_name, active_ingredient');
+        localDrugsList = local || [];
+
+        const { data: pupha } = await window.supabaseClient
+            .from('pupha_master')
+            .select('id, brand_name, active_ingredient')
+            .limit(100);
+        puphaMasterList = pupha || [];
+    } catch (e) {
+        console.error("Gyógyszertörzs betöltési hiba:", e);
+    }
+}
+
+// 2. ELŐZŐ TERÁPIA BETÖLTÉSE GOMB LOGIKÁJA
+async function loadPreviousPrescription() {
+    if (!currentPatientId) return;
+
+    try {
+        const { data: lastPrescription, error } = await window.supabaseClient
+            .from('prescriptions')
+            .select(`
+                id,
+                prescription_items(*, pupha_master:pupha_drug_id(*), local_inventory_master:local_drug_id(*))
+            `)
+            .eq('patient_id', currentPatientId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error || !lastPrescription || !lastPrescription.prescription_items) {
+            alert("Nem található korábbi terápia a betegnél!");
+            return;
+        }
+
+        selectedItems = [];
+        lastPrescription.prescription_items.forEach(item => {
+            const local = item.local_inventory_master;
+            const pupha = item.pupha_master;
+
+            const bName = local ? local.brand_name : (pupha ? pupha.brand_name : 'Gyógyszer');
+            const aIng = local ? local.active_ingredient : (pupha ? pupha.active_ingredient : '');
+
+            selectedItems.push({
+                puphaDrugId: item.pupha_drug_id || null,
+                localDrugId: item.local_drug_id || null,
+                brandName: bName,
+                activeIngredient: aIng,
+                doseMorning: item.dose_morning || 0,
+                doseNoon: item.dose_noon || 0,
+                doseEvening: item.dose_evening || 0,
+                doseNight: item.dose_night || 0
+            });
+        });
+
+        renderSelectedDrugs();
+        alert("Előző terápia sikeresen betöltve!");
+
+    } catch (e) {
+        console.error("Előző terápia betöltési hiba:", e);
+        alert("Hiba történt az előző terápia betöltésekor.");
+    }
 }
 
 function calculateDays() {
@@ -351,9 +474,9 @@ function calculateDays() {
     if (start && end && end >= start) {
         const diffTime = Math.abs(end - start);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        document.getElementById("daysCountBadge").innerText = `${diffDays} Napos Igénylés (${diffDays} külön tálca)`;
+        document.getElementById("daysPill").innerText = `${diffDays} Nap`;
     } else {
-        document.getElementById("daysCountBadge").innerText = "Érvénytelen dátumtartomány";
+        document.getElementById("daysPill").innerText = "0 Nap";
     }
 }
 
@@ -362,12 +485,10 @@ function setWeekendDates(includeFriday) {
     const dayOfWeek = now.getDay(); // 0: Vasárnap, 5: Péntek, 6: Szombat
 
     let friday = new Date(now);
-    let sunday = new Date(now);
-
-    // Kiszámoljuk a közelegő pénteket és vasárnapot
     const distToFriday = (5 - dayOfWeek + 7) % 7;
     friday.setDate(now.getDate() + distToFriday);
 
+    let sunday = new Date(friday);
     sunday.setDate(friday.getDate() + 2);
 
     const start = includeFriday ? friday : new Date(friday.getFullYear(), friday.getMonth(), friday.getDate() + 1);
@@ -384,26 +505,50 @@ function searchDrug(query) {
         return;
     }
 
-    const matches = puphaMasterList.filter(d => 
-        d.brand_name.toLowerCase().includes(query.toLowerCase()) ||
-        (d.active_ingredient && d.active_ingredient.toLowerCase().includes(query.toLowerCase()))
-    ).slice(0, 5);
+    const q = query.toLowerCase();
+
+    // Helyi készlet matches
+    const localMatches = localDrugsList.filter(d =>
+        d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
+    ).slice(0, 4);
+
+    // PUPHA matches
+    const puphaMatches = puphaMasterList.filter(d =>
+        d.brand_name.toLowerCase().includes(q) || (d.active_ingredient && d.active_ingredient.toLowerCase().includes(q))
+    ).slice(0, 4);
 
     let html = '<div style="background:white; border:1px solid #cbd5e1; border-radius:8px; padding:8px;">';
-    matches.forEach(m => {
-        html += `
-            <div style="padding:8px; cursor:pointer; border-bottom:1px solid #f1f5f9;" onclick="addDrugToTable('${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}')">
-                <strong>${m.brand_name}</strong> <span style="font-size:12px; color:#64748b;">(${m.active_ingredient || '-'})</span>
-            </div>
-        `;
-    });
+
+    if (localMatches.length > 0) {
+        html += '<div style="font-size:11px; font-weight:bold; color:#1565c0; padding:4px 8px;">🏠 HELYI KÉSZLET</div>';
+        localMatches.forEach(m => {
+            html += `
+                <div style="padding:8px; cursor:pointer; border-bottom:1px solid #f1f5f9;" onclick="addDrugToTable(null, '${m.id}', '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}')">
+                    <strong>${m.brand_name}</strong> <span style="font-size:12px; color:#64748b;">(${m.active_ingredient || '-'})</span>
+                </div>
+            `;
+        });
+    }
+
+    if (puphaMatches.length > 0) {
+        html += '<div style="font-size:11px; font-weight:bold; color:#2e7d32; padding:4px 8px; margin-top:4px;">📚 PUPHA TÖRZS</div>';
+        puphaMatches.forEach(m => {
+            html += `
+                <div style="padding:8px; cursor:pointer; border-bottom:1px solid #f1f5f9;" onclick="addDrugToTable('${m.id}', null, '${m.brand_name.replace(/'/g, "\\'")}', '${(m.active_ingredient || '').replace(/'/g, "\\'")}')">
+                    <strong>${m.brand_name}</strong> <span style="font-size:12px; color:#64748b;">(${m.active_ingredient || '-'})</span>
+                </div>
+            `;
+        });
+    }
+
     html += '</div>';
     container.innerHTML = html;
 }
 
-function addDrugToTable(id, brandName, activeIngredient) {
+function addDrugToTable(puphaId, localId, brandName, activeIngredient) {
     selectedItems.push({
-        drugId: id,
+        puphaDrugId: puphaId,
+        localDrugId: localId,
         brandName: brandName,
         activeIngredient: activeIngredient,
         doseMorning: 1,
@@ -440,7 +585,7 @@ function renderSelectedDrugs() {
     tbody.innerHTML = html;
 }
 
-// CIKLUSOS BEKÜLDÉS A CREATED_AT FELÜLÍRÁSÁVAL
+// CIKLUSOS BEKÜLDÉS
 async function submitMultiDayPrescription() {
     if (!currentPatientId) {
         alert("Hiányzó beteg azonosító!");
@@ -470,11 +615,10 @@ async function submitMultiDayPrescription() {
 
         while (currentDate <= endDate) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            // Létrehozzuk az adott napra datált created_at időbélyeget
             const customCreatedAt = `${dateStr}T08:00:00Z`;
             const customBarcode = `DA-${dateStr.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-            // 1. PRESCRIPTION LEKÉRDEZÉS
+            // 1. PRESCRIPTION BESZÚRÁSA
             const { data: newPrescription, error: pErr } = await window.supabaseClient
                 .from('prescriptions')
                 .insert({
@@ -494,7 +638,8 @@ async function submitMultiDayPrescription() {
             if (newPrescription) {
                 const itemsToInsert = selectedItems.map(item => ({
                     prescription_id: newPrescription.id,
-                    pupha_drug_id: item.drugId,
+                    pupha_drug_id: item.puphaDrugId || null,
+                    local_drug_id: item.localDrugId || null,
                     dose_morning: parseFloat(item.doseMorning) || 0,
                     dose_noon: parseFloat(item.doseNoon) || 0,
                     dose_evening: parseFloat(item.doseEvening) || 0,
