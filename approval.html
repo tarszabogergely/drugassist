@@ -249,7 +249,6 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
 
 .local-drug-item:hover { background: #f0f7ff; }
 
-/* KIVÁLASZTOTT HELYETTESÍTŐ ELEM STÍLUSA */
 .local-drug-item.selected-substitute {
     background-color: #e8f5e9 !important;
     border-left: 4px solid #2e7d32;
@@ -434,7 +433,6 @@ async function loadLocalInventory() {
     }
 }
 
-// 2. INTERAKCIÓK TÖRZSTÁBLÁJÁNAK LEKÉRDEZÉSE A SUPABASE-BŐL
 async function loadInteractionsMaster() {
     try {
         const { data, error } = await window.supabaseClient
@@ -507,7 +505,6 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
     }
 }
 
-// KÖLCSÖNHATÁSOK ÉS FIGYELMEZTETÉSEK BIZTONSÁGI ELLENŐRZÉSE
 async function checkWarnings(items) {
     const alertBox = document.getElementById("alertBox");
     const warningsList = document.getElementById("warningsList");
@@ -535,7 +532,6 @@ async function checkWarnings(items) {
             const ingA = activeIngredients[i].ingredient;
             const ingB = activeIngredients[j].ingredient;
 
-            // Kétirányú keresés a betöltött adatbázis mátrixban
             const match = dbInteractions.find(inter => {
                 const dbA = (inter.ingredient_a || '').toLowerCase().trim();
                 const dbB = (inter.ingredient_b || '').toLowerCase().trim();
@@ -552,20 +548,7 @@ async function checkWarnings(items) {
         }
     }
 
-    // C) KÉSZLETHIÁNY SZŰRÉS (CSAK A NEM SAJÁT GYÓGYSZEREKNÉL)
-    const missingCount = items.filter(item => {
-        if (item.is_own_medication) return false;
-        const pupha = item.pupha_master;
-        return !localInventory.some(l => 
-            (item.substituted_name && l.brand_name === item.substituted_name) ||
-            (pupha && (l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name))
-        );
-    }).length;
-
-    if (missingCount > 0) {
-        warnings.push(`🚨 <strong>Helyi készlethiány:</strong> ${missingCount} db gyógyszer nincs az osztályos készleten, helyettesítést igényel!`);
-    }
-
+    // FIGYELMEZTETÉS KIJELZÉSE (KÉSZLETHIÁNY RIASZTÁS KIKAPCSOLVA)
     if (warnings.length > 0) {
         alertBox.className = "alert-box alert-warning";
         alertBox.innerHTML = `<span>⚠️ ${warnings.length} figyelmeztetés (Kattintson)</span>`;
@@ -621,14 +604,14 @@ function renderMedicationTable() {
         const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
         const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
 
-        const isOwn = !!item.is_own_medication;
+        // IS_PATIENT_BROUGHT ÉS IS_OWN_MEDICATION BEAZONOSÍTÁSA
+        const isOwn = !!(item.is_patient_brought || item.is_own_medication);
 
         const isInStock = isOwn || localInventory.some(l => 
             (item.substituted_name && l.brand_name === item.substituted_name) ||
             (pupha && (l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name))
         );
 
-        // SAJÁT GYÓGYSZER SOR BEÁLLÍTÁSA
         let rowClass = isOwn ? 'row-own-med' : (isInStock ? 'row-in-stock' : 'row-out-of-stock');
         let clickAttr = isOwn ? '' : `onclick="openSubstituteModal(${idx})"`;
 
@@ -661,7 +644,7 @@ function renderMedicationTable() {
 
 function openSubstituteModal(index) {
     const item = prescriptionItems[index];
-    if (item.is_own_medication) return; // SAJÁT GYÓGYSZER NEM HELYETTESÍTHETŐ
+    if (item.is_patient_brought || item.is_own_medication) return; // SAJÁT GYÓGYSZER NEM HELYETTESÍTHETŐ
 
     selectedItemIndex = index;
 
@@ -709,7 +692,6 @@ function filterLocalList(searchTerm) {
 
     let html = '';
     filtered.forEach(drug => {
-        // ELLENŐRIZZÜK, HOGY EZ A DRUG VAN-E JELENLEG KIVÁLASZTVA
         const isSelected = item && (item.substituted_name === drug.brand_name || (item.local_drug_id === drug.id));
         const itemClass = `local-drug-item ${isSelected ? 'selected-substitute' : ''}`;
 
@@ -729,7 +711,6 @@ function filterLocalList(searchTerm) {
     listContainer.innerHTML = html;
 }
 
-// FELUGRÓ ABLAK NÉLKÜLI KIVÁLASZTÁS A MODALBAN
 function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
     const item = prescriptionItems[selectedItemIndex];
     if (item) {
@@ -737,7 +718,6 @@ function selectSubstitutedDrug(localDrugId, newBrandName, newIngredient) {
         item.substituted_name = newBrandName;
         item.substituted_ingredient = newIngredient;
         
-        // ÚJRARENDERELJÜK A MODAL LISTÁT A ZÖLD HÁTTÉRSZÍN KIEMELÉSHEZ
         const searchVal = document.getElementById("modalSearchInput").value;
         filterLocalList(searchVal);
     }
@@ -771,7 +751,6 @@ async function approvePrescription() {
     try {
         const user = Auth.getCurrentUser();
 
-        // 1. Módosított/Helyettesített tételek mentése
         for (const item of prescriptionItems) {
             const updatePayload = {
                 substituted_name: item.substituted_name || null,
@@ -798,7 +777,6 @@ async function approvePrescription() {
             }
         }
 
-        // 2. Igénylés lezárása / státusz frissítése
         const { error: prescErr } = await window.supabaseClient
             .from('prescriptions')
             .update({
