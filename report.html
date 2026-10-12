@@ -5,10 +5,11 @@
 <title>DrugAssist – Kimutatások & Statisztika</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Supabase SDK, Config & Auth -->
+<!-- Supabase SDK, Config, Auth & PDF Generator -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/pdf-generator.js"></script>
 
 <style>
 * { box-sizing: border-box; }
@@ -47,7 +48,7 @@ h1 { margin: 0; font-size: 22px; color: #1565c0; }
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     flex-wrap: wrap;
 }
 
@@ -78,7 +79,7 @@ h1 { margin: 0; font-size: 22px; color: #1565c0; }
     background: #1976d2;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 10px 18px;
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
@@ -88,6 +89,24 @@ h1 { margin: 0; font-size: 22px; color: #1565c0; }
 
 .filter-btn:hover { background: #1565c0; }
 
+.export-btn {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: 0.2s;
+    margin-left: auto;
+}
+
+.export-btn:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
 /* TAB NAVIGATION */
 .tab-container {
     display: flex;
@@ -95,13 +114,14 @@ h1 { margin: 0; font-size: 22px; color: #1565c0; }
     margin-bottom: 20px;
     border-bottom: 2px solid #e2e8f0;
     padding-bottom: 2px;
+    flex-wrap: wrap;
 }
 
 .tab-btn {
     background: none;
     border: none;
-    padding: 12px 20px;
-    font-size: 15px;
+    padding: 12px 18px;
+    font-size: 14px;
     font-weight: 600;
     color: #64748b;
     cursor: pointer;
@@ -138,23 +158,19 @@ th, td { padding: 12px 14px; font-size: 14px; text-align: left; }
 th { background-color: #f8fafc; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
 tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
-.progress-bar-bg {
-    background: #e2e8f0;
-    border-radius: 6px;
-    height: 10px;
-    width: 100%;
-    overflow: hidden;
-}
-
-.progress-bar-fill {
-    background: #1565c0;
-    height: 100%;
-    border-radius: 6px;
-}
-
 .badge-stat {
     background: #e3f2fd;
     color: #1565c0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.badge-warning {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
     padding: 4px 10px;
     border-radius: 12px;
     font-weight: 700;
@@ -174,7 +190,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 <div class="container">
 
-    <!-- KÖZÖS SZŰRŐSÁV -->
+    <!-- KÖZÖS SZŰRŐSÁV ÉS EXPORT GOMB -->
     <div class="filter-card">
         <div class="filter-group">
             <label>Kezdő dátum</label>
@@ -195,21 +211,23 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
             </select>
         </div>
         <button class="filter-btn" onclick="loadAllReports()">🔍 Szűrés alkalmazása</button>
+        <button class="export-btn" onclick="exportActiveTabToPdf()">📄 Riport Nyomtatása / PDF</button>
     </div>
 
     <!-- TAB NAVIGÁCIÓ -->
     <div class="tab-container">
-        <button class="tab-btn active" onclick="switchTab('usage')">📈 Gyógyszerfelhasználás</button>
-        <button class="tab-btn" onclick="switchTab('staff')">👥 Készítési Statisztika</button>
-        <button class="tab-btn" onclick="switchTab('sla')">⏱️ Átfutási Idők (SLA)</button>
-        <button class="tab-btn" onclick="switchTab('substitution')">🔄 Helyettesítési Napló</button>
+        <button class="tab-btn active" onclick="switchTab('usage', this)">📈 Gyógyszerfelhasználás</button>
+        <button class="tab-btn" onclick="switchTab('staff', this)">👥 Készítési Statisztika</button>
+        <button class="tab-btn" onclick="switchTab('sla', this)">⏱️ Átfutási Idők (SLA)</button>
+        <button class="tab-btn" onclick="switchTab('substitution', this)">🔄 Helyettesítési Napló</button>
+        <button class="tab-btn" onclick="switchTab('warnings', this)">⚠️ Figyelmeztetések</button>
     </div>
 
     <!-- TAB 1: GYÓGYSZERFELHASZNÁLÁS -->
     <div id="tab-usage" class="tab-panel active">
         <div class="report-card">
             <h2 style="margin-top:0; font-size:18px; color:#1e293b;">💊 Gyógyszerfelhasználási Összesítő</h2>
-            <table>
+            <table id="table-usage">
                 <thead>
                     <tr>
                         <th>Gyógyszernév / Hatóanyag</th>
@@ -227,8 +245,8 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     <!-- TAB 2: KÉSZÍTÉSI STATISZTIKA -->
     <div id="tab-staff" class="tab-panel">
         <div class="report-card">
-            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">👥 Munkatársi Teljesítmény & Aktiválás</h2>
-            <table>
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">👥 Munkatársi Teljesítmény & Aktivitás</h2>
+            <table id="table-staff">
                 <thead>
                     <tr>
                         <th>Munkatárs neve</th>
@@ -249,7 +267,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     <div id="tab-sla" class="tab-panel">
         <div class="report-card">
             <h2 style="margin-top:0; font-size:18px; color:#1e293b;">⏱️ Gyógyszerelési Folyamat Átfutási Idői</h2>
-            <table>
+            <table id="table-sla">
                 <thead>
                     <tr>
                         <th>Folyamatlépés</th>
@@ -260,17 +278,17 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
                 <tbody id="slaTableBody">
                     <tr>
                         <td>Igénylés feladása ➔ Gyógyszerészi jóváhagyás</td>
-                        <td><strong id="timeSubToRev">14 perc</strong></td>
+                        <td><strong>14 perc</strong></td>
                         <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Gyors</span></td>
                     </tr>
                     <tr>
                         <td>Jóváhagyás ➔ Tálcázás / Elkészítés</td>
-                        <td><strong id="timeRevToDisp">32 perc</strong></td>
+                        <td><strong>32 perc</strong></td>
                         <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Normál</span></td>
                     </tr>
                     <tr>
                         <td>Tálcázás ➔ Végső Ellenőrzés (Lezárás)</td>
-                        <td><strong id="timeDispToComp">18 perc</strong></td>
+                        <td><strong>18 perc</strong></td>
                         <td><span class="badge-stat" style="background:#e8f5e9; color:#2e7d32;">Gyors</span></td>
                     </tr>
                 </tbody>
@@ -281,8 +299,8 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     <!-- TAB 4: HELYETTESÍTÉSI NAPLÓ -->
     <div id="tab-substitution" class="tab-panel">
         <div class="report-card">
-            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">🔄 Gyógyszer Helyettesítési és Cserenapló</h2>
-            <table>
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">🔄 Gyógyszer Helyettesítési Napló</h2>
+            <table id="table-substitution">
                 <thead>
                     <tr>
                         <th>Eredetileg felírt gyógyszer</th>
@@ -298,9 +316,31 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
         </div>
     </div>
 
+    <!-- TAB 5: FIGYELMEZTETÉSEK & AUDIT -->
+    <div id="tab-warnings" class="tab-panel">
+        <div class="report-card">
+            <h2 style="margin-top:0; font-size:18px; color:#1e293b;">⚠️ Kiszűrt Kölcsönhatások, Duplikációk & Riasztások</h2>
+            <table id="table-warnings">
+                <thead>
+                    <tr>
+                        <th>Beteg</th>
+                        <th>Osztály</th>
+                        <th>Típus / Riasztás</th>
+                        <th>Érintett Gyógyszer(ek)</th>
+                    </tr>
+                </thead>
+                <tbody id="warningsTableBody">
+                    <tr><td colspan="4" style="text-align:center; color:#64748b;">Adatok betöltése...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 <script>
+let activeTabId = 'usage';
+
 document.addEventListener("DOMContentLoaded", () => {
     Auth.requireAuth();
     
@@ -312,11 +352,12 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAllReports();
 });
 
-function switchTab(tabId) {
+function switchTab(tabId, btnElement) {
+    activeTabId = tabId;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
 
-    event.target.classList.add('active');
+    btnElement.classList.add('active');
     document.getElementById(`tab-${tabId}`).classList.add('active');
 }
 
@@ -329,7 +370,6 @@ async function loadAllReports() {
     const endIso = new Date(`${endDate}T23:59:59`).toISOString();
 
     try {
-        // 1. LEKÉRJÜK A MEGADOTT IDŐSZAK IGENYLÉSEIT ÉS TÉTELEIT
         let query = window.supabaseClient
             .from('prescriptions')
             .select(`
@@ -343,20 +383,15 @@ async function loadAllReports() {
         const { data: prescriptions, error } = await query;
         if (error) throw error;
 
-        // Szűrés osztályra, ha nem ALL
         const filteredPrescriptions = (prescriptions || []).filter(p => {
             if (selectedDept === 'ALL') return true;
             return p.patients && p.patients.department === selectedDept;
         });
 
-        // REPORT 1: GYÓGYSZERFELHASZNÁLÁS RENDERELÉSE
         renderUsageReport(filteredPrescriptions);
-
-        // REPORT 2: KÉSZÍTÉSI STATISZTIKA RENDERELÉSE
         await renderStaffReport(filteredPrescriptions);
-
-        // REPORT 4: HELYETTESÍTÉSI NAPLÓ RENDERELÉSE
         renderSubstitutionReport(filteredPrescriptions);
+        renderWarningsReport(filteredPrescriptions);
 
     } catch (err) {
         console.error("Riport betöltési hiba:", err);
@@ -483,6 +518,86 @@ function renderSubstitutionReport(prescriptions) {
     } else {
         tbody.innerHTML = html;
     }
+}
+
+function renderWarningsReport(prescriptions) {
+    const tbody = document.getElementById("warningsTableBody");
+    let html = '';
+    let count = 0;
+
+    prescriptions.forEach(p => {
+        const patientName = p.patients ? p.patients.name : 'Ismeretlen beteg';
+        const dept = p.patients ? p.patients.department : '-';
+        const items = p.prescription_items || [];
+
+        items.forEach(item => {
+            // Megjegyzésekben vagy speciális mezőkben lévő riasztások szűrése
+            if (item.substitution_note || item.is_own_medication) {
+                count++;
+                const drugName = item.substituted_name || (item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer');
+                const note = item.substitution_note || (item.is_own_medication ? 'Saját Hozott Gyógyszer' : 'Megjegyzés rögzítve');
+                
+                html += `
+                    <tr>
+                        <td><strong>${patientName}</strong></td>
+                        <td>${dept}</td>
+                        <td><span class="badge-warning">⚠️ ${note}</span></td>
+                        <td>${drugName}</td>
+                    </tr>
+                `;
+            }
+        });
+    });
+
+    if (count === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Nem található rögzített figyelmeztetés vagy interakció a kiválasztott időszakban.</td></tr>';
+    } else {
+        tbody.innerHTML = html;
+    }
+}
+
+function exportActiveTabToPdf() {
+    const activeTable = document.querySelector(`#tab-${activeTabId} table`);
+    if (!activeTable) return;
+
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
+
+    const printContent = `
+        <!DOCTYPE html>
+        <html lang="hu">
+        <head>
+        <meta charset="UTF-8">
+        <title>DrugAssist_Riport_${startDate}</title>
+        <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1e293b; }
+            .header { border-bottom: 2px solid #1565c0; padding-bottom: 8px; margin-bottom: 20px; }
+            .title { font-size: 18pt; font-weight: bold; color: #1565c0; }
+            .subtitle { font-size: 10pt; color: #475569; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 9pt; text-align: left; }
+            th { background: #f1f5f9; font-weight: bold; }
+        </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="title">DrugAssist – Riport Export</div>
+                <div class="subtitle">Markusovszky Egyetemi Oktatókórház, Szombathely</div>
+                <div class="subtitle"><strong>Időszak:</strong> ${startDate} – ${endDate}</div>
+            </div>
+            ${activeTable.outerHTML}
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+    }, 400);
 }
 </script>
 
