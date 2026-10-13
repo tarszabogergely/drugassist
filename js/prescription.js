@@ -43,7 +43,7 @@ window.Prescription = {
             
             document.getElementById("patientInfo").innerText = `TAJ: ${patient.taj || '-'} | Születési dátum: ${birthDateStr}${ageStr} | Ágy: ${patient.room_bed || '-'} | Dátum: ${this.targetDate}`;
 
-            // 2. Igénylés lekérése KIFJEZETTEN a megadott napra (targetDate)
+            // 2. Igénylés lekérése KIFEJEZETTEN a megadott napra (targetDate)
             const startOfDay = `${this.targetDate}T00:00:00.000Z`;
             const endOfDay = `${this.targetDate}T23:59:59.999Z`;
 
@@ -418,13 +418,13 @@ window.Prescription = {
 
                 const insertData = {
                     patient_id: this.currentPatient.id,
-                    status: 'submitted', // Helyes status ENUM
+                    status: 'submitted',
                     barcode: barcode,
                     created_at: fullIsoDate
                 };
 
                 if (user && user.id) {
-                    insertData.prescribed_by = user.id; // Helyes oszlopnév
+                    insertData.prescribed_by = user.id;
                 }
 
                 const { data: newPresc, error: insertErr } = await window.supabaseClient
@@ -437,7 +437,7 @@ window.Prescription = {
                 prescriptionId = newPresc.id;
             }
 
-            // TÉTELEK BESZÚRÁSA Pontos Oszlopnevekkel
+            // TÉTELEK BESZÚRÁSA (created_at nélkül)
             const itemsToInsert = this.orderItems.map(item => ({
                 prescription_id: prescriptionId,
                 pupha_drug_id: item.pupha_id || null,
@@ -448,8 +448,7 @@ window.Prescription = {
                 dose_noon: item.dose_noon || 0,
                 dose_evening: item.dose_evening || 0,
                 dose_night: item.dose_night || 0,
-                is_patient_brought: !!item.is_patient_brought,
-                created_at: fullIsoDate
+                is_patient_brought: !!item.is_patient_brought
             }));
 
             const { error: itemsErr } = await window.supabaseClient
