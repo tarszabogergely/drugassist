@@ -193,7 +193,7 @@ table input[type="number"]:disabled {
 
 <!-- LOCK BANNER (HA MÁR JÓVÁHAGYTA A PATIKA) -->
 <div id="lockBanner" class="lock-banner">
-    🔒 A mai napra vonatkozó igénylést a patika már feldolgozta / elfogadta, ezért a rendelés már nem módosítható.
+    🔒 A kiválasztott napra vonatkozó igénylést a patika már feldolgozta / elfogadta, ezért a rendelés már nem módosítható.
 </div>
 
 <!-- BETEG FEJLÉC -->
@@ -207,9 +207,9 @@ table input[type="number"]:disabled {
 
 <!-- GYÓGYSZER KERESŐ -->
 <div class="card">
-    <h3>💊 Gyógyszer hozzáadása (PuPha törzs)</h3>
+    <h3 style="margin-top:0; color:#1e293b;">💊 Gyógyszer hozzáadása (Kórházi törzs + PuPha)</h3>
     <div class="search-container">
-        <input type="text" id="puphaSearchInput" class="search-input" placeholder="Gépeljen be legalább 3 karaktert (Gyógyszernév, Hatóanyag)..." oninput="Prescription.searchPupha(this.value.trim())">
+        <input type="text" id="puphaSearchInput" class="search-input" placeholder="Gépeljen be legalább 2 karaktert (Gyógyszernév, Hatóanyag)..." oninput="Prescription.searchDrugs(this.value.trim())">
         <div id="puphaSearchResults" class="dropdown-menu"></div>
     </div>
 
@@ -248,12 +248,12 @@ document.addEventListener("DOMContentLoaded", () => {
     updateDateTime();
     setInterval(updateDateTime, 10000);
 
-    // URL paraméterből beteg ID kiolvasása (pl. prescription.html?patientId=uuid)
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get('patientId');
+    const targetDate = urlParams.get('date'); // YYYY-MM-DD paraméter
 
     if (patientId) {
-        Prescription.loadPatientOrder(patientId);
+        Prescription.loadPatientOrder(patientId, targetDate);
     } else {
         alert("Hiányzó beteg azonosító!");
         navigateBack();
