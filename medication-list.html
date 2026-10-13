@@ -144,10 +144,10 @@ async function loadMedicationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. LÉPÉS: 'reviewed' (jóváhagyott) igénylések lekérése tételekkel együtt
+        // 1. LÉPÉS: 'reviewed' (jóváhagyott) igénylések lekérése, kiegészítve updated_at mezővel
         const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, created_at, patient_id, prescription_items(id)')
+            .select('id, created_at, updated_at, patient_id, prescription_items(id)')
             .eq('status', 'reviewed')
             .order('created_at', { ascending: false });
 
@@ -207,7 +207,8 @@ async function loadMedicationList() {
                             <tr>
                                 <th>Beteg neve</th>
                                 <th>Ágy</th>
-                                <th>Jóváhagyva</th>
+                                <th>Dátum</th>
+                                <th>Módosítva</th>
                                 <th>Gyógyszersorok</th>
                                 <th></th>
                             </tr>
@@ -216,13 +217,18 @@ async function loadMedicationList() {
             `;
 
             list.forEach(item => {
-                const timeStr = item.created_at ? new Date(item.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const createdDateObj = item.created_at ? new Date(item.created_at) : null;
+                const updatedDateObj = item.updated_at ? new Date(item.updated_at) : createdDateObj;
+                
+                const dateStr = createdDateObj ? createdDateObj.toLocaleDateString('hu-HU') : '-';
+                const timeStr = updatedDateObj ? updatedDateObj.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
                 const itemCount = item.prescription_items ? item.prescription_items.length : 0;
 
                 html += `
                     <tr>
                         <td><strong>${item.patientName}</strong></td>
                         <td>${item.bed}</td>
+                        <td>${dateStr}</td>
                         <td>${timeStr}</td>
                         <td>${itemCount} tétel</td>
                         <td style="text-align: right;">
