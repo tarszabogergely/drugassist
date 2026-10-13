@@ -511,9 +511,12 @@ function renderMedicationTable() {
         const rowClass = isCompleted ? 'row-scanned-completed' : 'row-in-stock';
 
         const batchData = itemBatchMap[idx];
-        const batchStr = batchData 
-            ? `<span class="batch-info">LOT: ${batchData.lot_number} | EXP: ${batchData.expiry_date}</span>` 
-            : '<span style="color:#94a3b8; font-size:12px;">-</span>';
+const batchStr = batchData 
+    ? `<div class="batch-info" style="text-align:center; line-height:1.4;">
+         <div>LOT: ${batchData.lot_number}</div>
+         <div>EXP: ${batchData.expiry_date}</div>
+       </div>` 
+    : '<span style="color:#94a3b8; font-size:12px;">-</span>';
 
         html += `
             <tr class="${rowClass} ${isScannedActive}">
