@@ -202,6 +202,7 @@ async function loadApprovalList() {
                             <tr>
                                 <th>Beteg neve</th>
                                 <th>Ágy</th>
+                                <th>Dátum</th>
                                 <th>Utolsó módosítás</th>
                                 <th>Gyógyszersorok</th>
                                 <th></th>
@@ -211,7 +212,9 @@ async function loadApprovalList() {
             `;
 
             list.forEach(p => {
-                const timeStr = new Date(p.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+                const createdDate = new Date(p.created_at);
+                const dateStr = createdDate.toLocaleDateString('hu-HU');
+                const timeStr = createdDate.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
                 const itemCount = p.prescription_items ? p.prescription_items.length : 0;
                 const patientName = p.patients ? p.patients.name : 'Ismeretlen';
                 const bed = p.patients ? p.patients.room_bed : '-';
@@ -220,6 +223,7 @@ async function loadApprovalList() {
                     <tr>
                         <td><strong>${patientName}</strong></td>
                         <td>${bed}</td>
+                        <td><strong>${dateStr}</strong></td>
                         <td>${timeStr}</td>
                         <td>${itemCount} tétel</td>
                         <td style="text-align: right;">
