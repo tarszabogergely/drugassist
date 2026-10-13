@@ -219,6 +219,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 }
 .btn-edit-patient:hover { background: #f1f5f9; }
 
+/* GOMB STÍLUSOK A HAZAMENT ÉS ÚJRAFELVÉTEL FUNKCIÓKHOZ */
 .btn-discharge-patient {
     background: #fef2f2;
     border: 1px solid #fca5a5;
@@ -230,6 +231,18 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
     font-size: 13px;
 }
 .btn-discharge-patient:hover { background: #fee2e2; }
+
+.btn-readmit-patient {
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    color: #1b5e20;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+}
+.btn-readmit-patient:hover { background: #c8e6c9; }
 
 .close-modal-btn {
     background: transparent;
@@ -382,7 +395,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
             </div>
             <div class="header-actions">
                 <button class="btn-edit-patient" onclick="editCurrentPatientFromModal()">✏️ Szerkesztés</button>
-                <button id="dischargeBtnInModal" class="btn-discharge-patient" onclick="dischargeCurrentPatientFromModal()">Hazament</button>
+                <button id="dischargeBtnInModal" class="btn-discharge-patient" onclick="togglePatientStatusFromModal()">Hazament</button>
                 <button class="close-modal-btn" onclick="closeCalendarModal()">&times;</button>
             </div>
         </div>
@@ -631,12 +644,14 @@ async function openPatientCalendarModal(index) {
     document.getElementById("calModalTaj").innerText = activePatient.taj || '-';
     document.getElementById("calModalBed").innerText = activePatient.room_bed || '-';
 
-    // Passzív beteg esetén elrejtjük a Hazament gombot
-    const dischargeBtn = document.getElementById("dischargeBtnInModal");
+    // A gomb feliratának és stílusának dinamikus beállítása a beteg státusza alapján
+    const statusBtn = document.getElementById("dischargeBtnInModal");
     if (activePatient.status === 'discharged') {
-        dischargeBtn.style.display = 'none';
+        statusBtn.innerText = 'Újrafelvétel';
+        statusBtn.className = 'btn-readmit-patient';
     } else {
-        dischargeBtn.style.display = 'inline-block';
+        statusBtn.innerText = 'Hazament';
+        statusBtn.className = 'btn-discharge-patient';
     }
 
     // Naptár alaphelyzetbe állítása az aktuális hónapra
@@ -767,20 +782,31 @@ function editCurrentPatientFromModal() {
     openPatientFormModal(activePatient);
 }
 
-async function dischargeCurrentPatientFromModal() {
+// Beteg status váltása (Hazament / Újrafelvétel) a modálból
+async function togglePatientStatusFromModal() {
     if (!activePatient) return;
-    if (!confirm(`Biztosan elbocsátja ${activePatient.name} nevű beteget?`)) return;
+    
+    const isDischarged = activePatient.status === 'discharged';
+    const actionText = isDischarged ? 'újrafelveszi' : 'elbocsátja';
+    const confirmMessage = `Biztosan ${actionText} ${activePatient.name} nevű beteget?`;
+
+    if (!confirm(confirmMessage)) return;
 
     try {
+        const updateData = isDischarged
+            ? { status: 'active', discharge_date: null }
+            : { status: 'discharged', discharge_date: new Date() };
+
         await window.supabaseClient
             .from('patients')
-            .update({ status: 'discharged', discharge_date: new Date() })
+            .update(updateData)
             .eq('id', activePatient.id);
 
         closeCalendarModal();
         loadDepartmentPatients();
     } catch (e) {
-        console.error("Hiba az elbocsátáskor:", e);
+        console.error("Hiba a beteg státuszának módosításakor:", e);
+        alert("Hiba történt a beteg státuszának módosítása során!");
     }
 }
 
