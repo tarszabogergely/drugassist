@@ -321,8 +321,6 @@ window.Prescription = {
         }
 
         try {
-            const user = Auth.getCurrentUser();
-
             // Dátum és idő pontos felépítése
             const now = new Date();
             const timePart = now.toTimeString().split(' ')[0]; // HH:mm:ss
@@ -361,11 +359,6 @@ window.Prescription = {
                     barcode: generatedBarcode,
                     created_at: fullIsoDate
                 };
-
-                // Ha van azonosítható felhasználói ID
-                if (user && user.id) {
-                    insertData.doctor_id = user.id;
-                }
 
                 const { data: newPresc, error: createErr } = await window.supabaseClient
                     .from('prescriptions')
