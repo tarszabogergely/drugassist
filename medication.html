@@ -431,9 +431,10 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientBed").innerText = patient.room_bed || '-';
         }
 
+        // KIEGÉSZÍTVE: local_inventory_master(*) TÁBLA IS CSATLAKOZTATVA
         let query = window.supabaseClient
             .from('prescriptions')
-            .select('*, prescription_items(*, pupha_master(*))')
+            .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
             .eq('patient_id', patientId);
 
         if (prescriptionId) {
@@ -470,7 +471,7 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
     }
 }
 
-// GYÓGYSZERTÁBLÁZAT KIRAJZOLÁSA
+// GYÓGYSZERTÁBLÁZAT KIRAJZOLÁSA (INTELLIGENS FORRÁS MEGHATÁROZÁSSAL)
 function renderMedicationTable() {
     const container = document.getElementById("medicationList");
     if (!prescriptionItems || prescriptionItems.length === 0) {
@@ -497,9 +498,14 @@ function renderMedicationTable() {
 
     prescriptionItems.forEach((item, idx) => {
         const pupha = item.pupha_master;
-        const displayBrandName = item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen');
-        const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
-        const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
+        const local = item.local_inventory_master;
+
+        const defaultBrandName = local ? local.brand_name : (pupha ? pupha.brand_name : 'Gyógyszer');
+        const defaultIngredient = local ? local.active_ingredient : (pupha ? pupha.active_ingredient : '-');
+
+        const displayBrandName = item.substituted_name || defaultBrandName;
+        const originalBrandName = item.substituted_name ? defaultBrandName : null;
+        const ingredient = item.substituted_ingredient || defaultIngredient;
 
         const isScannedActive = (lastScannedIndex === idx) ? 'row-scanned-active' : '';
         const isCompleted = scannedIndices.has(idx);
@@ -544,10 +550,14 @@ async function processBarcodeScan(barcode) {
     const localMatch = localInventory.find(l => l.barcode === cleanBarcode);
 
     if (localMatch) {
-        const matchedIdx = prescriptionItems.findIndex(item => 
-            (item.substituted_name && item.substituted_name === localMatch.brand_name) ||
-            (item.pupha_master && (item.pupha_master.ttt_code === localMatch.ttt_code || item.pupha_master.brand_name === localMatch.brand_name))
-        );
+        const matchedIdx = prescriptionItems.findIndex(item => {
+            const pupha = item.pupha_master;
+            const local = item.local_inventory_master;
+            
+            return (item.substituted_name && item.substituted_name === localMatch.brand_name) ||
+                   (local && (local.id === localMatch.id || local.brand_name === localMatch.brand_name)) ||
+                   (pupha && ((l.ttt_code && pupha.ttt_code && l.ttt_code === pupha.ttt_code) || pupha.brand_name === localMatch.brand_name));
+        });
 
         if (matchedIdx !== -1) {
             currentScanningItemIndex = matchedIdx;
@@ -634,11 +644,13 @@ async function saveBatchAndConfirm() {
 
     const currentItem = prescriptionItems[currentScanningItemIndex];
     const pupha = currentItem ? currentItem.pupha_master : null;
+    const local = currentItem ? currentItem.local_inventory_master : null;
+
     const drugName = (currentScanningDrug && currentScanningDrug.brand_name) 
-        || (currentItem ? (currentItem.substituted_name || (pupha ? pupha.brand_name : '')) : '').trim();
+        || (currentItem ? (currentItem.substituted_name || (local ? local.brand_name : (pupha ? pupha.brand_name : ''))) : '').trim();
 
     const tttCode = (currentScanningDrug && currentScanningDrug.ttt_code) 
-        || (pupha ? pupha.ttt_code : null);
+        || (local ? local.ttt_code : (pupha ? pupha.ttt_code : null));
 
     try {
         // 1. Megnézzük, létezik-e már ez a sarzs az inventory_batches táblában
@@ -689,7 +701,6 @@ async function saveBatchAndConfirm() {
         console.error("Hiba a sarzs mentése során:", e);
     }
 
-    // Tétel frissítése az oldalon a memóriában is
     itemBatchMap[currentScanningItemIndex] = { lot_number: lot, expiry_date: exp };
     scannedIndices.add(currentScanningItemIndex);
     lastScannedIndex = currentScanningItemIndex;
