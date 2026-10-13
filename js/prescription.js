@@ -149,7 +149,6 @@ window.Prescription = {
 
             if (puphaData) {
                 puphaData.forEach(item => {
-                    // Elkerüljük a duplikációt, ha a helyi készletben már benne van
                     const exists = combinedResults.some(r => r.brand_name.toLowerCase() === item.brand_name.toLowerCase());
                     if (!exists) {
                         combinedResults.push({
@@ -195,7 +194,6 @@ window.Prescription = {
         document.getElementById("puphaSearchResults").style.display = "none";
         document.getElementById("puphaSearchInput").value = "";
 
-        // Megnézzük, szerepel-e már a táblázatban
         const exists = this.items.some(it => 
             (type === 'local' && it.local_id === id) || 
             (type === 'pupha' && it.pupha_id === id) ||
@@ -273,7 +271,6 @@ window.Prescription = {
         if (this.isLocked) return;
 
         try {
-            // A legutolsó jóváhagyott/lezárt rendelés megkeresése
             const { data: prevPrescs, error } = await window.supabaseClient
                 .from('prescriptions')
                 .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
@@ -294,7 +291,7 @@ window.Prescription = {
                 const pupha = item.pupha_master;
 
                 return {
-                    id: null, // Új tételként mentjük
+                    id: null,
                     local_id: item.local_id || (local ? local.id : null),
                     pupha_id: item.pupha_id || (pupha ? pupha.id : null),
                     brand_name: local ? local.brand_name : (pupha ? pupha.brand_name : (item.substituted_name || 'Gyógyszer')),
@@ -325,41 +322,54 @@ window.Prescription = {
 
         try {
             const user = Auth.getCurrentUser();
-            const createdAtDate = `${this.targetDate}T${new Date().toISOString().substring(11)}`;
+
+            // Dátum és idő pontos felépítése
+            const now = new Date();
+            const timePart = now.toTimeString().split(' ')[0]; // HH:mm:ss
+            const fullIsoDate = `${this.targetDate}T${timePart}.000Z`;
 
             let prescriptionId = this.currentPrescription ? this.currentPrescription.id : null;
 
             if (prescriptionId) {
                 // Meglévő (draft/pending) igénylés frissítése
-                await window.supabaseClient
+                const { error: updateErr } = await window.supabaseClient
                     .from('prescriptions')
                     .update({
                         status: 'pending',
-                        doctor_id: user ? user.id : null,
-                        updated_at: new Date()
+                        updated_at: new Date().toISOString()
                     })
                     .eq('id', prescriptionId);
 
-                // Régi tételek törlése és újak beszúrása
-                await window.supabaseClient
+                if (updateErr) throw updateErr;
+
+                // Régi tételek törlése
+                const { error: delErr } = await window.supabaseClient
                     .from('prescription_items')
                     .delete()
                     .eq('prescription_id', prescriptionId);
+
+                if (delErr) throw delErr;
 
             } else {
                 // Új igénylés beszúrása az adott napra
                 const cleanDate = this.targetDate.replace(/-/g, '');
                 const generatedBarcode = `DA-${cleanDate}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+                const insertData = {
+                    patient_id: this.currentPatient.id,
+                    status: 'pending',
+                    barcode: generatedBarcode,
+                    created_at: fullIsoDate
+                };
+
+                // Ha van azonosítható felhasználói ID
+                if (user && user.id) {
+                    insertData.doctor_id = user.id;
+                }
+
                 const { data: newPresc, error: createErr } = await window.supabaseClient
                     .from('prescriptions')
-                    .insert({
-                        patient_id: this.currentPatient.id,
-                        doctor_id: user ? user.id : null,
-                        status: 'pending',
-                        barcode: generatedBarcode,
-                        created_at: createdAtDate
-                    })
+                    .insert(insertData)
                     .select()
                     .single();
 
@@ -368,17 +378,22 @@ window.Prescription = {
             }
 
             // Tételek beszúrása a prescription_items táblába
-            const itemsToInsert = this.items.map(it => ({
-                prescription_id: prescriptionId,
-                local_id: it.local_id,
-                pupha_id: it.pupha_id,
-                dose_morning: it.dose_morning,
-                dose_noon: it.dose_noon,
-                dose_evening: it.dose_evening,
-                dose_night: it.dose_night,
-                is_patient_brought: it.is_patient_brought,
-                created_at: createdAtDate
-            }));
+            const itemsToInsert = this.items.map(it => {
+                const row = {
+                    prescription_id: prescriptionId,
+                    dose_morning: it.dose_morning || 0,
+                    dose_noon: it.dose_noon || 0,
+                    dose_evening: it.dose_evening || 0,
+                    dose_night: it.dose_night || 0,
+                    is_patient_brought: it.is_patient_brought || false,
+                    created_at: fullIsoDate
+                };
+
+                if (it.local_id) row.local_id = it.local_id;
+                if (it.pupha_id) row.pupha_id = it.pupha_id;
+
+                return row;
+            });
 
             const { error: itemsErr } = await window.supabaseClient
                 .from('prescription_items')
@@ -390,8 +405,8 @@ window.Prescription = {
             window.location.replace("doctor-dashboard.html");
 
         } catch (e) {
-            console.error("Hiba a mentéskor:", e);
-            alert("Hiba történt az igénylés feladása során!");
+            console.error("Részletes hiba a mentéskor:", e);
+            alert(`Hiba történt az igénylés feladása során: ${e.message || JSON.stringify(e)}`);
         }
     }
 };
