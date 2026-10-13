@@ -47,6 +47,60 @@ h1 {
     padding: 30px;
 }
 
+/* SZŰRŐ SÁV */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: white;
+    padding: 14px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    margin-bottom: 25px;
+}
+
+.filter-bar input[type="date"] {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+    outline: none;
+    font-weight: 600;
+    color: #334155;
+}
+
+.filter-btn-today {
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffe0b2;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.filter-btn-today:hover {
+    background: #ffe0b2;
+}
+
+.filter-btn-submit {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.filter-btn-submit:hover {
+    background: #1565c0;
+}
+
 .section {
     margin-bottom: 40px;
 }
@@ -130,8 +184,20 @@ tr:hover {
     </div>
 </header>
 
-<div id="contentContainer" class="container">
-    <div class="empty-msg">Adatok betöltése...</div>
+<div class="container">
+
+    <!-- DÁTUMSZŰRŐ SÁV -->
+    <div class="filter-bar">
+        <button class="filter-btn-today" onclick="setTodayFilter()">Mai nap</button>
+        <input type="date" id="filterStartDate">
+        <input type="date" id="filterEndDate">
+        <button class="filter-btn-submit" onclick="loadApprovalList()">Szűrés</button>
+    </div>
+
+    <div id="contentContainer">
+        <div class="empty-msg">Adatok betöltése...</div>
+    </div>
+
 </div>
 
 <script>
@@ -141,7 +207,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (user) {
         document.getElementById("userName").innerText = user.name || user.email;
 
-        // Felhasználói profil név kiolvasása a Supabase-ből
         try {
             const { data: profile } = await window.supabaseClient
                 .from('profiles')
@@ -160,21 +225,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadApprovalList();
 });
 
+function setTodayFilter() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById("filterStartDate").value = todayStr;
+    document.getElementById("filterEndDate").value = todayStr;
+    loadApprovalList();
+}
+
 async function loadApprovalList() {
     const container = document.getElementById("contentContainer");
+    const startDateVal = document.getElementById("filterStartDate").value;
+    const endDateVal = document.getElementById("filterEndDate").value;
 
     try {
-        // 1. Submitted státuszú igénylések lekérése beteg- és tételtadattal
-        const { data: prescriptions, error } = await window.supabaseClient
+        // 1. Submitted státuszú igénylések alap lekérdezése
+        let query = window.supabaseClient
             .from('prescriptions')
             .select('id, created_at, patient_id, patients(name, room_bed, department), prescription_items(id)')
-            .eq('status', 'submitted')
-            .order('created_at', { ascending: true });
+            .eq('status', 'submitted');
+
+        // Dátumszűrés alkalmazása, ha meg van adva
+        if (startDateVal) {
+            query = query.gte('created_at', `${startDateVal}T00:00:00Z`);
+        }
+        if (endDateVal) {
+            query = query.lte('created_at', `${endDateVal}T23:59:59Z`);
+        }
+
+        const { data: prescriptions, error } = await query.order('created_at', { ascending: true });
 
         if (error) throw error;
 
         if (!prescriptions || prescriptions.length === 0) {
-            container.innerHTML = '<div class="empty-msg">Jelenleg nincs jóváhagyásra váró gyógyszerigénylés.</div>';
+            container.innerHTML = '<div class="empty-msg">Jelenleg nincs jóváhagyásra váró gyógyszerigénylés a kiválasztott időszakban.</div>';
             return;
         }
 
