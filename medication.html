@@ -397,7 +397,7 @@ async function loadLocalInventory() {
             .from('local_inventory_master')
             .select('*')
             .eq('is_active', true)
-            .limit(10000); // Kifejezett limit megadása, hogy ne álljon meg 1000 soros alapértelmezett küszöbnél
+            .limit(10000);
 
         localInventory = data || [];
     } catch (e) {
@@ -433,7 +433,6 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientBed").innerText = patient.room_bed || '-';
         }
 
-        // KIEGÉSZÍTVE: local_inventory_master(*) TÁBLA IS CSATLAKOZTATVA
         let query = window.supabaseClient
             .from('prescriptions')
             .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
@@ -455,7 +454,6 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
 
             prescriptionItems = prescription.prescription_items || [];
 
-            // Korábban már rögzített sarzsok beolvasása a tételsorokból
             prescriptionItems.forEach((item, idx) => {
                 if (item.batch_number && item.expiration_date) {
                     itemBatchMap[idx] = {
@@ -473,7 +471,6 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
     }
 }
 
-// GYÓGYSZERTÁBLÁZAT KIRAJZOLÁSA (INTELLIGENS FORRÁS MEGHATÁROZÁSSAL)
 function renderMedicationTable() {
     const container = document.getElementById("medicationList");
     if (!prescriptionItems || prescriptionItems.length === 0) {
@@ -544,44 +541,72 @@ function renderMedicationTable() {
     container.innerHTML = html;
 }
 
-// VONALKÓD BEOLVASÁS
+// INTELLIGENS, FRISSÍTETT VONALKÓD BEOLVASÁS
 async function processBarcodeScan(barcode) {
     if (!barcode) return;
     
-    // Minden nem látható / nem számjegyet eltávolítunk
+    // Tiszta számjegyek kinyerése
     const cleanBarcode = String(barcode).replace(/\D/g, '').trim();
-
     if (!cleanBarcode) return;
 
-    // Típus- és szóközfüggetlen keresés a helyi készletben
-    const localMatch = localInventory.find(l => {
+    // 1. Keresés a betöltött localInventory tömbben
+    let localMatch = localInventory.find(l => {
         if (!l.barcode) return false;
         const dbBarcode = String(l.barcode).replace(/\D/g, '').trim();
-        return dbBarcode === cleanBarcode;
+        return dbBarcode === cleanBarcode || dbBarcode.endsWith(cleanBarcode);
     });
 
+    // 2. Tétel azonosítása az igénylésben
+    let matchedIdx = -1;
+
     if (localMatch) {
-        const matchedIdx = prescriptionItems.findIndex(item => {
+        const matchName = String(localMatch.brand_name || '').trim().toLowerCase();
+
+        matchedIdx = prescriptionItems.findIndex(item => {
             const pupha = item.pupha_master;
             const local = item.local_inventory_master;
-            
-            return (item.substituted_name && item.substituted_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase()) ||
-                   (local && (local.id === localMatch.id || local.brand_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase())) ||
-                   (pupha && ((localMatch.ttt_code && pupha.ttt_code && localMatch.ttt_code === pupha.ttt_code) || 
-                              (pupha.brand_name && pupha.brand_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase())));
+
+            const subName = String(item.substituted_name || '').trim().toLowerCase();
+            const localName = String(local ? local.brand_name : '').trim().toLowerCase();
+            const puphaName = String(pupha ? pupha.brand_name : '').trim().toLowerCase();
+
+            return (local && local.id === localMatch.id) ||
+                   (subName && (subName === matchName || matchName.includes(subName) || subName.includes(matchName))) ||
+                   (localName && (localName === matchName || matchName.includes(localName) || localName.includes(matchName))) ||
+                   (puphaName && (puphaName === matchName || matchName.includes(puphaName) || puphaName.includes(matchName))) ||
+                   (pupha && localMatch.ttt_code && pupha.ttt_code === localMatch.ttt_code);
+        });
+    }
+
+    // 3. FALLBACK: Ha a localInventory tömbben nem volt meg, de az igénylés tételében benne van a pupha/local vonalkódja
+    if (matchedIdx === -1) {
+        matchedIdx = prescriptionItems.findIndex(item => {
+            const pupha = item.pupha_master;
+            const local = item.local_inventory_master;
+
+            const pBarcode = pupha && pupha.barcode ? String(pupha.barcode).replace(/\D/g, '').trim() : '';
+            const lBarcode = local && local.barcode ? String(local.barcode).replace(/\D/g, '').trim() : '';
+
+            return (pBarcode && pBarcode === cleanBarcode) || (lBarcode && lBarcode === cleanBarcode);
         });
 
         if (matchedIdx !== -1) {
-            currentScanningItemIndex = matchedIdx;
-            currentScanningDrug = localMatch;
-
-            // LOT & EXP Modal megnyitása
-            await openBatchModal(localMatch);
-        } else {
-            alert(`A beolvasott gyógyszer (${localMatch.brand_name}) nem szerepel ebben az igénylésben!`);
+            const item = prescriptionItems[matchedIdx];
+            localMatch = item.local_inventory_master || { 
+                brand_name: item.substituted_name || (item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer'),
+                ttt_code: item.pupha_master ? item.pupha_master.ttt_code : null
+            };
         }
+    }
+
+    if (matchedIdx !== -1 && localMatch) {
+        currentScanningItemIndex = matchedIdx;
+        currentScanningDrug = localMatch;
+
+        // LOT & EXP Modal megnyitása
+        await openBatchModal(localMatch);
     } else {
-        alert(`Ismeretlen vonalkód a helyi készletben! (${cleanBarcode})`);
+        alert(`Ismeretlen vonalkód, vagy a gyógyszer nem szerepel ebben az igénylésben! (${cleanBarcode})`);
     }
 
     document.getElementById("scannerInput").value = '';
@@ -665,7 +690,6 @@ async function saveBatchAndConfirm() {
         || (local ? local.ttt_code : (pupha ? pupha.ttt_code : null));
 
     try {
-        // 1. Megnézzük, létezik-e már ez a sarzs az inventory_batches táblában
         const { data: existingBatch } = await window.supabaseClient
             .from('inventory_batches')
             .select('id')
@@ -674,7 +698,6 @@ async function saveBatchAndConfirm() {
             .maybeSingle();
 
         if (!existingBatch) {
-            // Beszúrás az inventory_batches törzstáblába
             const { error: insertErr } = await window.supabaseClient
                 .from('inventory_batches')
                 .insert({
@@ -688,12 +711,9 @@ async function saveBatchAndConfirm() {
 
             if (insertErr) {
                 console.error("inventory_batches beszúrási hiba:", insertErr);
-            } else {
-                console.log("Új sarzs sikeresen rögzítve az inventory_batches törzsbe!");
             }
         }
 
-        // 2. Mentés a konkrét beteg igényléséhez (prescription_items tábla)
         if (currentItem && currentItem.id) {
             const { error: itemErr } = await window.supabaseClient
                 .from('prescription_items')
@@ -721,7 +741,6 @@ async function saveBatchAndConfirm() {
     renderMedicationTable();
 }
 
-// GYÓGYSZERELÉS LEZÁRÁSA
 async function finishMedication() {
     if (!currentPrescriptionId) return;
 
