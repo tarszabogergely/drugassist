@@ -31,7 +31,7 @@ header {
 header h1 {
     margin: 0;
     font-size: 22px;
-    color: #1e293b; /* Vagy #000000 feketéhez */
+    color: #1e293b;
 }
 
 .header-right {
@@ -146,7 +146,6 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
     transition: 0.2s;
 }
 
-/* SAJÁT HOZOTT GYÓGYSZER SOR STÍLUS */
 .row-own-med {
     background-color: #f1f5f9 !important; /* Szürke */
     color: #64748b;
@@ -330,7 +329,7 @@ th { background-color: #f8fafc; color: #475569; font-weight: 600; }
         <button id="printLabelButton" onclick="window.print()">Címke nyomtatása</button>
     </section>
 
-    <!-- FIGYELMEZTETÉSEK BUBORÉK (KATTINTHATÓ) -->
+    <!-- FIGYELMEZTETÉSEK BUBORÉK -->
     <section class="card action-card clickable-card" onclick="openWarningsModal()">
         <h2>⚠️ Figyelmeztetések</h2>
         <div id="alertBox" class="alert-box alert-success">
@@ -415,13 +414,11 @@ let activeTab = 'atc';
 let isWarningsApproved = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    // 3. AUTENTIKÁCIÓ ÉS FELHASZNÁLÓ KIJELZÉSE
     const user = Auth.requireAuth();
     if (user) {
         document.getElementById("userName").innerText = user.name || user.email;
     }
 
-    // 2. BÖNGÉSZŐ VISSZA GOMB KEZELÉSE -> approval-list.html
     history.pushState(null, null, location.href);
     window.onpopstate = function () {
         window.location.href = 'approval-list.html';
@@ -495,9 +492,10 @@ async function loadPatientAndPrescription(patientId, prescriptionId) {
             document.getElementById("patientBed").innerText = patient.room_bed || '-';
         }
 
+        // KIEGÉSZÍTVE: A local_inventory_master(*) TÁBLA ÖSSZEKAPCSOLÁSA IS BEKERÜLT
         let query = window.supabaseClient
             .from('prescriptions')
-            .select('*, prescription_items(*, pupha_master(*))')
+            .select('*, prescription_items(*, pupha_master(*), local_inventory_master(*))')
             .eq('patient_id', patientId);
 
         if (prescriptionId) {
@@ -529,7 +527,9 @@ async function checkWarnings(items) {
     let warnings = [];
 
     const activeIngredients = items.map(i => {
-        const ingredient = i.substituted_ingredient || (i.pupha_master ? i.pupha_master.active_ingredient : '');
+        const local = i.local_inventory_master;
+        const pupha = i.pupha_master;
+        const ingredient = i.substituted_ingredient || (local ? local.active_ingredient : (pupha ? pupha.active_ingredient : ''));
         return {
             item: i,
             ingredient: ingredient.toLowerCase().trim()
@@ -589,6 +589,7 @@ function acceptWarnings() {
     btn.innerText = "✓ Gyógyszerelés Jóváhagyása";
 }
 
+// JAVÍTVA: INTELLIGENS NÉV- ÉS KÉSZLETMEGHATÁROZÁS MINDKÉT TÁBLÁBÓL
 function renderMedicationTable() {
     const container = document.getElementById("medicationList");
     if (!prescriptionItems || prescriptionItems.length === 0) {
@@ -614,15 +615,23 @@ function renderMedicationTable() {
 
     prescriptionItems.forEach((item, idx) => {
         const pupha = item.pupha_master;
-        const displayBrandName = item.substituted_name || (pupha ? pupha.brand_name : 'Ismeretlen');
-        const originalBrandName = item.substituted_name ? (pupha ? pupha.brand_name : '') : null;
-        const ingredient = item.substituted_ingredient || (pupha ? pupha.active_ingredient : '-');
+        const local = item.local_inventory_master;
+
+        // Bármelyik táblában is van a gyógyszer, kiolvassa a nevét és hatóanyagát
+        const defaultBrandName = local ? local.brand_name : (pupha ? pupha.brand_name : 'Gyógyszer');
+        const defaultIngredient = local ? local.active_ingredient : (pupha ? pupha.active_ingredient : '-');
+
+        const displayBrandName = item.substituted_name || defaultBrandName;
+        const originalBrandName = item.substituted_name ? defaultBrandName : null;
+        const ingredient = item.substituted_ingredient || defaultIngredient;
 
         const isOwn = !!(item.is_patient_brought || item.is_own_medication);
 
-        const isInStock = isOwn || localInventory.some(l => 
+        // Készleten van, ha saját hozott, vagy ha local_drug_id van megadva, vagy ha a localInventory-ban megtalálható
+        const isInStock = isOwn || !!item.local_drug_id || localInventory.some(l => 
             (item.substituted_name && l.brand_name === item.substituted_name) ||
-            (pupha && (l.ttt_code === pupha.ttt_code || l.brand_name === pupha.brand_name))
+            (local && l.id === local.id) ||
+            (pupha && ((l.ttt_code && l.ttt_code === pupha.ttt_code) || l.brand_name === pupha.brand_name))
         );
 
         let rowClass = isOwn ? 'row-own-med' : (isInStock ? 'row-in-stock' : 'row-out-of-stock');
@@ -661,7 +670,11 @@ function openSubstituteModal(index) {
 
     selectedItemIndex = index;
 
-    document.getElementById("modalTitle").innerText = `${item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer'} Helyettesítése`;
+    const currentName = item.substituted_name || 
+                        (item.local_inventory_master ? item.local_inventory_master.brand_name : 
+                        (item.pupha_master ? item.pupha_master.brand_name : 'Gyógyszer'));
+
+    document.getElementById("modalTitle").innerText = `${currentName} Helyettesítése`;
     document.getElementById("editMorning").value = item.dose_morning || 0;
     document.getElementById("editNoon").value = item.dose_noon || 0;
     document.getElementById("editEvening").value = item.dose_evening || 0;
@@ -684,7 +697,9 @@ function switchModalTab(tab) {
 
 function filterLocalList(searchTerm) {
     const item = prescriptionItems[selectedItemIndex];
-    const targetAtc = item && item.pupha_master ? item.pupha_master.atc_code : '';
+    const puphaAtc = item && item.pupha_master ? item.pupha_master.atc_code : '';
+    const localAtc = item && item.local_inventory_master ? item.local_inventory_master.atc_code : '';
+    const targetAtc = puphaAtc || localAtc;
 
     let filtered = localInventory;
 
@@ -694,7 +709,7 @@ function filterLocalList(searchTerm) {
 
     if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(l => l.brand_name.toLowerCase().includes(term) || l.active_ingredient.toLowerCase().includes(term));
+        filtered = filtered.filter(l => l.brand_name.toLowerCase().includes(term) || (l.active_ingredient && l.active_ingredient.toLowerCase().includes(term)));
     }
 
     const listContainer = document.getElementById("localDrugList");
@@ -709,10 +724,10 @@ function filterLocalList(searchTerm) {
         const itemClass = `local-drug-item ${isSelected ? 'selected-substitute' : ''}`;
 
         html += `
-            <div class="${itemClass}" onclick="selectSubstitutedDrug('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${drug.active_ingredient.replace(/'/g, "\\'")}')">
+            <div class="${itemClass}" onclick="selectSubstitutedDrug('${drug.id}', '${drug.brand_name.replace(/'/g, "\\'")}', '${(drug.active_ingredient || '').replace(/'/g, "\\'")}')">
                 <div>
                     <strong style="color:#1e293b;">${drug.brand_name}</strong>
-                    <div style="font-size:12px; color:#64748b;">Hatóanyag: ${drug.active_ingredient} | ATC: ${drug.atc_code}</div>
+                    <div style="font-size:12px; color:#64748b;">Hatóanyag: ${drug.active_ingredient || '-'} | ATC: ${drug.atc_code || '-'}</div>
                 </div>
                 <button style="font-size:12px; padding:4px 10px; ${isSelected ? 'background:#2e7d32;' : ''}">
                     ${isSelected ? '✓ Kiválasztva' : 'Kiválasztás'}
