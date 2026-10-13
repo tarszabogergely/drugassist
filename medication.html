@@ -547,19 +547,29 @@ function renderMedicationTable() {
 // VONALKÓD BEOLVASÁS
 async function processBarcodeScan(barcode) {
     if (!barcode) return;
-    const cleanBarcode = barcode.trim();
+    
+    // Minden nem látható / nem számjegyet eltávolítunk
+    const cleanBarcode = String(barcode).replace(/\D/g, '').trim();
 
-    const localMatch = localInventory.find(l => l.barcode === cleanBarcode);
+    if (!cleanBarcode) return;
+
+    // Típus- és szóközfüggetlen keresés a helyi készletben
+    const localMatch = localInventory.find(l => {
+        if (!l.barcode) return false;
+        const dbBarcode = String(l.barcode).replace(/\D/g, '').trim();
+        return dbBarcode === cleanBarcode;
+    });
 
     if (localMatch) {
         const matchedIdx = prescriptionItems.findIndex(item => {
-    const pupha = item.pupha_master;
-    const local = item.local_inventory_master;
-    
-    return (item.substituted_name && item.substituted_name === localMatch.brand_name) ||
-           (local && (local.id === localMatch.id || local.brand_name === localMatch.brand_name)) ||
-           (pupha && ((localMatch.ttt_code && pupha.ttt_code && localMatch.ttt_code === pupha.ttt_code) || pupha.brand_name === localMatch.brand_name));
-});
+            const pupha = item.pupha_master;
+            const local = item.local_inventory_master;
+            
+            return (item.substituted_name && item.substituted_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase()) ||
+                   (local && (local.id === localMatch.id || local.brand_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase())) ||
+                   (pupha && ((localMatch.ttt_code && pupha.ttt_code && localMatch.ttt_code === pupha.ttt_code) || 
+                              (pupha.brand_name && pupha.brand_name.trim().toLowerCase() === localMatch.brand_name.trim().toLowerCase())));
+        });
 
         if (matchedIdx !== -1) {
             currentScanningItemIndex = matchedIdx;
@@ -568,10 +578,10 @@ async function processBarcodeScan(barcode) {
             // LOT & EXP Modal megnyitása
             await openBatchModal(localMatch);
         } else {
-            alert("A beolvasott gyógyszer nem szerepel ebben az igénylésben!");
+            alert(`A beolvasott gyógyszer (${localMatch.brand_name}) nem szerepel ebben az igénylésben!`);
         }
     } else {
-        alert("Ismeretlen vonalkód a helyi készletben!");
+        alert(`Ismeretlen vonalkód a helyi készletben! (${cleanBarcode})`);
     }
 
     document.getElementById("scannerInput").value = '';
