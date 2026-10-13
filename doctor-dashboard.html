@@ -353,7 +353,7 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
     <!-- KERESŐ ÉS SZŰRŐ SÁV -->
     <div class="filter-bar">
-        <input type="text" id="searchInput" class="search-input" placeholder="Beteg neve, TAJ száma vagy ágyszáma keresése..." oninput="filterPatients()">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔎" oninput="filterPatients()">
         <select id="statusFilter" class="select-filter" onchange="loadDepartmentPatients()">
             <option value="active">Aktív ápolt betegek</option>
             <option value="discharged">Elbocsátott betegek</option>
@@ -366,10 +366,10 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
             <thead>
                 <tr>
                     <th style="width: 90px;">Ágyszám</th>
-                    <th>Beteg Neve</th>
-                    <th>TAJ Szám</th>
-                    <th>Születési Dátum (Kor)</th>
-                    <th>Mai Gyógyszerelés Státusza</th>
+                    <th>Beteg neve</th>
+                    <th>TAJ szám</th>
+                    <th>Születési dátum (Kor)</th>
+                    <th>Mai gyógyszerelés státusza</th>
                 </tr>
             </thead>
             <tbody id="patientTableBody">
@@ -511,7 +511,7 @@ async function loadDepartmentPatients() {
     
     document.getElementById("subTitle").innerText = viewStatus === 'active' 
         ? "Aktív ápolt betegek listája" 
-        : "Elbocsátott / Passzív betegek listája";
+        : "Elbocsátott betegek listája";
 
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Betegek betöltése...</td></tr>';
 
