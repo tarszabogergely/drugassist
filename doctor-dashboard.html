@@ -335,15 +335,15 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
             <h2 id="deptTitle">Osztályos Betegek</h2>
             <div id="subTitle" style="color:#64748b; font-size:14px; margin-top:4px;">Aktív ápolt betegek listája</div>
         </div>
-        <button class="add-patient-btn" onclick="openPatientFormModal()">➕ Új beteg rögzítése</button>
+        <button class="add-patient-btn" onclick="openPatientFormModal()">Új beteg rögzítése</button>
     </div>
 
     <!-- KERESŐ ÉS SZŰRŐ SÁV -->
     <div class="filter-bar">
         <input type="text" id="searchInput" class="search-input" placeholder="Beteg neve, TAJ száma vagy ágyszáma keresése..." oninput="filterPatients()">
         <select id="statusFilter" class="select-filter" onchange="loadDepartmentPatients()">
-            <option value="active">✓ Aktív ápolt betegek</option>
-            <option value="discharged">📦 Elbocsátott / Passzív betegek</option>
+            <option value="active">Aktív ápolt betegek</option>
+            <option value="discharged">Elbocsátott betegek</option>
         </select>
     </div>
 
