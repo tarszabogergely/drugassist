@@ -57,6 +57,7 @@ h1 {
     border-radius: 12px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
     margin-bottom: 25px;
+    flex-wrap: wrap;
 }
 
 .filter-bar input[type="date"] {
@@ -69,7 +70,7 @@ h1 {
     color: #334155;
 }
 
-.filter-btn-today {
+.filter-btn-quick {
     background: #fff3e0;
     color: #e65100;
     border: 1px solid #ffe0b2;
@@ -81,7 +82,7 @@ h1 {
     transition: 0.2s;
 }
 
-.filter-btn-today:hover {
+.filter-btn-quick:hover {
     background: #ffe0b2;
 }
 
@@ -188,7 +189,9 @@ tr:hover {
 
     <!-- DÁTUMSZŰRŐ SÁV -->
     <div class="filter-bar">
-        <button class="filter-btn-today" onclick="setTodayFilter()">Mai nap</button>
+        <button class="filter-btn-quick" onclick="setQuickDateFilter(0)">Ma</button>
+        <button class="filter-btn-quick" onclick="setQuickDateFilter(1)">Holnap</button>
+        <button class="filter-btn-quick" onclick="setQuickDateFilter(2)">Holnapután</button>
         <input type="date" id="filterStartDate">
         <input type="date" id="filterEndDate">
         <button class="filter-btn-submit" onclick="loadApprovalList()">Szűrés</button>
@@ -225,10 +228,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadApprovalList();
 });
 
-function setTodayFilter() {
-    const todayStr = new Date().toISOString().split('T')[0];
-    document.getElementById("filterStartDate").value = todayStr;
-    document.getElementById("filterEndDate").value = todayStr;
+// GYORS DÁTUMBEÁLLÍTÁS (0: Ma, 1: Holnap, 2: Holnapután)
+function setQuickDateFilter(offsetDays) {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + offsetDays);
+    const dateStr = targetDate.toISOString().split('T')[0];
+
+    document.getElementById("filterStartDate").value = dateStr;
+    document.getElementById("filterEndDate").value = dateStr;
     loadApprovalList();
 }
 
