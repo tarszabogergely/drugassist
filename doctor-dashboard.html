@@ -322,10 +322,10 @@ tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 <header>
     <h1>DrugAssist – Osztályos Betegek</h1>
     <div class="header-right">
-    <span id="userName" style="font-weight:600;">Felhasználó: Betöltés...</span>
-    <span id="deptBadge" class="dept-badge">Osztály: Betöltés...</span>
-    <button class="logout-btn" onclick="Auth.logout()">Kijelentkezés</button>
-</div>
+        <span id="userName" style="font-weight:600;">Felhasználó: Betöltés...</span>
+        <span id="deptBadge" class="dept-badge">Osztály: Betöltés...</span>
+        <button class="logout-btn" onclick="Auth.logout()">Kijelentkezés</button>
+    </div>
 </header>
 
 <div class="container">
@@ -491,7 +491,7 @@ function calculateAge(birthDateStr) {
     return age;
 }
 
-// 1. Osztályos betegek és mai igénylések betöltése
+// 1. Osztályos betegek és szigorúan MAI igénylések betöltése
 async function loadDepartmentPatients() {
     const tbody = document.getElementById("patientTableBody");
     const viewStatus = document.getElementById("statusFilter").value;
@@ -523,10 +523,17 @@ async function loadDepartmentPatients() {
         todaysPrescriptionsMap = {};
         
         if (patientIds.length > 0) {
+            // Mai nap kezdete és vége ISO formátumban
+            const todayStr = new Date().toISOString().substring(0, 10);
+            const startOfToday = `${todayStr}T00:00:00.000Z`;
+            const endOfToday = `${todayStr}T23:59:59.999Z`;
+
             const { data: prescriptions, error: prescErr } = await window.supabaseClient
                 .from('prescriptions')
                 .select('*')
                 .in('patient_id', patientIds)
+                .gte('created_at', startOfToday)
+                .lte('created_at', endOfToday)
                 .order('created_at', { ascending: false });
 
             if (!prescErr && prescriptions) {
@@ -671,14 +678,12 @@ async function renderMonthDays() {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Napok betöltése...</td></tr>';
 
     try {
-        // Hónap első és utolsó napja ISO formátumban
         const startOfMonth = new Date(currentYear, currentMonth, 1);
         const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
 
         const startDateStr = startOfMonth.toISOString();
         const endDateStr = endOfMonth.toISOString();
 
-        // Igénylések lekérése a hónapra ehhez a beteghez
         const { data: prescriptions, error } = await window.supabaseClient
             .from('prescriptions')
             .select('*')
@@ -690,14 +695,13 @@ async function renderMonthDays() {
         patientPrescriptionsForMonth = {};
         if (!error && prescriptions) {
             prescriptions.forEach(p => {
-                const dayKey = p.created_at.substring(0, 10); // YYYY-MM-DD
+                const dayKey = p.created_at.substring(0, 10);
                 if (!patientPrescriptionsForMonth[dayKey]) {
                     patientPrescriptionsForMonth[dayKey] = p;
                 }
             });
         }
 
-        // Hónap napjainak összeállítása
         const totalDays = endOfMonth.getDate();
         let html = '';
 
@@ -757,14 +761,12 @@ function openMultiDayPrescription() {
     location.href = `multi-day-prescription.html?patientId=${activePatient.id}`;
 }
 
-// Szerkesztés a modálból
 function editCurrentPatientFromModal() {
     if (!activePatient) return;
     closeCalendarModal();
     openPatientFormModal(activePatient);
 }
 
-// Hazament gomb a modálból
 async function dischargeCurrentPatientFromModal() {
     if (!activePatient) return;
     if (!confirm(`Biztosan elbocsátja ${activePatient.name} nevű beteget?`)) return;
@@ -782,7 +784,6 @@ async function dischargeCurrentPatientFromModal() {
     }
 }
 
-// 3. RÖGZÍTŐ / SZERKESZTŐ FORM MODAL
 function openPatientFormModal(patient = null) {
     if (patient) {
         document.getElementById("formModalTitle").innerText = "✏️ Beteg adatainak szerkesztése";
@@ -813,7 +814,6 @@ function closeFormModalOnOutside(e) {
     }
 }
 
-// Beteg mentése Supabase-be
 async function savePatient() {
     const patientId = document.getElementById("patientId").value;
     const name = document.getElementById("patientNameInput").value.trim();
