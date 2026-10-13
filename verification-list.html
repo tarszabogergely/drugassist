@@ -31,7 +31,7 @@ header {
 header h1 {
     margin: 0;
     font-size: 22px;
-    color: #1e293b; /* Vagy #000000 feketéhez */
+    color: #1e293b;
 }
 
 .header-right {
@@ -160,10 +160,10 @@ async function loadVerificationList() {
     const container = document.getElementById("contentContainer");
 
     try {
-        // 1. LÉPÉS: 'dispensed' státuszú igénylések lekérése tételekkel együtt
+        // 1. LÉPÉS: 'dispensed' státuszú igénylések lekérése (kiegészítve az updated_at mezővel)
         const { data: prescriptions, error: prescError } = await window.supabaseClient
             .from('prescriptions')
-            .select('id, created_at, patient_id, prescription_items(id)')
+            .select('id, created_at, updated_at, patient_id, prescription_items(id)')
             .eq('status', 'dispensed')
             .order('created_at', { ascending: false });
 
@@ -228,7 +228,8 @@ async function loadVerificationList() {
                             <tr>
                                 <th>Beteg neve</th>
                                 <th>Ágy</th>
-                                <th>Kiadagolva</th>
+                                <th>Dátum</th>
+                                <th>Módosítva</th>
                                 <th>Gyógyszersorok</th>
                                 <th style="text-align: right;">Művelet</th>
                             </tr>
@@ -237,12 +238,17 @@ async function loadVerificationList() {
             `;
 
             list.forEach(item => {
-                const timeStr = item.created_at ? new Date(item.created_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const createdDateObj = item.created_at ? new Date(item.created_at) : null;
+                const updatedDateObj = item.updated_at ? new Date(item.updated_at) : createdDateObj;
+
+                const dateStr = createdDateObj ? createdDateObj.toLocaleDateString('hu-HU') : '-';
+                const timeStr = updatedDateObj ? updatedDateObj.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '-';
 
                 html += `
                     <tr>
                         <td><strong style="color:#1e293b;">${item.patientName}</strong></td>
                         <td>${item.bed}</td>
+                        <td>${dateStr}</td>
                         <td>${timeStr}</td>
                         <td>${item.itemCount} tétel</td>
                         <td style="text-align: right;">
